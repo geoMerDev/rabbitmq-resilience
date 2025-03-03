@@ -1,0 +1,306 @@
+openapi: 3.0.3
+info:
+  title: Rabbitmq Resilience API
+  version: "1.0.0"
+paths:
+  /api/v1/inbox-event/pagination:
+    post:
+      summary: Get paginated inbox events
+      operationId: getPaginatedInboxEvents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                itemsPerPage:
+                  type: integer
+                  example: 10
+                page:
+                  type: integer
+                  example: 1
+                sortingKey:
+                  type: string
+                  example: "createdAt"
+                sortingOrder:
+                  type: string
+                  enum: [ "asc", "desc" ]
+                  example: "asc"
+                search:
+                  type: string
+                  example: "uuid or type"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalItems:
+                    type: integer
+                    example: 100
+                  inboxEvents:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        uuid:
+                          type: string
+                          example: "123e4567-e89b-12d3-a456-426614174000"
+                        type:
+                          type: string
+                          example: "eventType"
+                        headers:
+                          type: object
+                          additionalProperties: true
+                        properties:
+                          type: object
+                          additionalProperties: true
+                        payload:
+                          type: object
+                          additionalProperties: true
+                        createdAt:
+                          type: string
+                          format: date-time
+                          example: "2023-01-01T00:00:00Z"
+                        updatedAt:
+                          type: string
+                          format: date-time
+                          example: "2023-01-01T00:00:00Z"
+                        deletedAt:
+                          type: string
+                          format: date-time
+                          nullable: true
+                          example: null
+  /api/v1/inbox-event/{uuid}:
+    get:
+      summary: Get inbox event by UUID
+      operationId: getInboxEventByUuid
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  inboxEvent:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      uuid:
+                        type: string
+                        example: "123e4567-e89b-12d3-a456-426614174000"
+                      type:
+                        type: string
+                        example: "eventType"
+                      headers:
+                        type: object
+                        additionalProperties: true
+                      properties:
+                        type: object
+                        additionalProperties: true
+                      payload:
+                        type: object
+                        additionalProperties: true
+                      createdAt:
+                        type: string
+                        format: date-time
+                        example: "2023-01-01T00:00:00Z"
+                      updatedAt:
+                        type: string
+                        format: date-time
+                        example: "2023-01-01T00:00:00Z"
+                      deletedAt:
+                        type: string
+                        format: date-time
+                        nullable: true
+                        example: null
+                      process:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              example: 1
+                            eventId:
+                              type: integer
+                              example: 1
+                            processName:
+                              type: string
+                              example: "processName"
+                            duration:
+                              type: number
+                              example: 120
+                            createdAt:
+                              type: string
+                              format: date-time
+                              example: "2023-01-01T00:00:00Z"
+                            updatedAt:
+                              type: string
+                              format: date-time
+                              example: "2023-01-01T00:00:00Z"
+                            deletedAt:
+                              type: string
+                              format: date-time
+                              nullable: true
+                              example: null
+  /api/v1/outbox-event/pagination:
+    post:
+      summary: Get paginated outbox events
+      operationId: getPaginatedOutboxEvents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                itemsPerPage:
+                  type: integer
+                  example: 10
+                page:
+                  type: integer
+                  example: 1
+                sortingKey:
+                  type: string
+                  example: "createdAt"
+                sortingOrder:
+                  type: string
+                  enum: [ "asc", "desc" ]
+                  example: "asc"
+                search:
+                  type: string
+                  example: "uuid or type"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalItems:
+                    type: integer
+                    example: 100
+                  outboxEvents:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        uuid:
+                          type: string
+                          example: "123e4567-e89b-12d3-a456-426614174000"
+                        type:
+                          type: string
+                          example: "eventType"
+                        headers:
+                          type: object
+                          additionalProperties: true
+                        properties:
+                          type: object
+                          additionalProperties: true
+                        payload:
+                          type: object
+                          additionalProperties: true
+                        deliveryInfo:
+                          type: object
+                          additionalProperties: true
+                          nullable: true
+                          example: null
+                        attempts:
+                          type: integer
+                          example: 3
+                        createdAt:
+                          type: string
+                          format: date-time
+                          example: "2023-01-01T00:00:00Z"
+                        updatedAt:
+                          type: string
+                          format: date-time
+                          example: "2023-01-01T00:00:00Z"
+                        deletedAt:
+                          type: string
+                          format: date-time
+                          nullable: true
+                          example: null
+  /api/v1/rabbitmq/info:
+    get:
+      summary: Get RabbitMQ info
+      operationId: getRabbitMQInfo
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  connectionStatus:
+                    type: string
+                    example: "Connected"
+                  host:
+                    type: string
+                    example: "localhost"
+                  virtualHost:
+                    type: string
+                    example: "/"
+                  mainQueueName:
+                    type: string
+                    example: "mainQueue"
+                  mainQueueStatus:
+                    type: object
+                    properties:
+                      queue:
+                        type: string
+                        example: "mainQueue"
+                      messageCount:
+                        type: integer
+                        example: 10
+                      consumerCount:
+                        type: integer
+                        example: 2
+                  retryQueueStatus:
+                    type: object
+                    properties:
+                      queue:
+                        type: string
+                        example: "retryQueue"
+                      messageCount:
+                        type: integer
+                        example: 5
+                      consumerCount:
+                        type: integer
+                        example: 1
+                  deadLetterQueueStatus:
+                    type: object
+                    properties:
+                      queue:
+                        type: string
+                        example: "deadLetterQueue"
+                      messageCount:
+                        type: integer
+                        example: 0
+                      consumerCount:
+                        type: integer
+                        example: 0
+                  prefetch:
+                    type: integer
+                    example: 10
