@@ -16,4 +16,11 @@ export interface EventResilienceHandlerConfig {
      * The delay in milliseconds between retry attempts.
      */
     delayInMs: number;
+
+    /**
+     * dev mode flag
+     */
+    devMode?: boolean;
+
+
 }

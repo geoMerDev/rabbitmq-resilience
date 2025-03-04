@@ -1,16 +1,25 @@
 {
   "name": "rabbitmq-resilience",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "dev": "tsnd --respawn --clear -r tsconfig-paths/register src/app.ts",
     "build": "rimraf ./dist && tsc && tsc-alias"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "rabbitmq",
+    "resilience",
+    "event",
+    "DDD"
+  ],
+  "author": "geomerdev",
   "license": "MIT",
-  "description": "",
+  "description": "RabbitMQ resilience is a library that allows you to manage the resilience of your RabbitMQ events",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/geoMerDev/rabbitmq-resilience.git"
+  },
   "devDependencies": {
     "@eslint/js": "^9.11.0",
     "@types/amqplib": "0.10.6",

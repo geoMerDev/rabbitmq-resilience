@@ -96,7 +96,7 @@ export class OutboxEventDatasourceImpl implements OutboxEventDatasource {
         const [errors, outboxEventDto] = OutboxEventDto.create({
             uuid: rabbitMQMessageDto.properties.messageId,
             type: rabbitMQMessageDto.properties.type,
-            headers: rabbitMQMessageDto.properties.headers,
+            headers: rabbitMQMessageDto.properties.headers ?? {},
             properties: rabbitMQMessageDto.properties,
             payload: JSON.parse(rabbitMQMessageDto.content.toString()),
             deliveryInfo: deliveryInfo,

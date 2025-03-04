@@ -22,7 +22,7 @@ export class RabbitMQResilienceSocketManager {
 
     private static setupSocketEvents() {
         RabbitMQResilienceSocketManager.io.on('connection', (socket: Socket) => {
-            console.log('a user connected', socket.id);
+            console.log('RabbitMQResilience: a user connected', socket.id);
         })
     }
 

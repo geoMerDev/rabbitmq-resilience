@@ -71,9 +71,9 @@ export class RabbitMQResilience {
      */
     private async syncTables() {
         DbSequelize(this.config.sequelizeConnection).then(
-            () => console.log('Tables synced')
+            () => console.log('RabbitMQResilience: Database tables synchronized')
         ).catch(
-            (e) => console.log(e)
+            (e) => console.log("RabbitMQResilience: ",e)
         );
     }
 

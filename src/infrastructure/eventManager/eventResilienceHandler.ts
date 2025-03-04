@@ -30,6 +30,7 @@ export class EventResilienceHandler {
     private readonly immediateRetryAttempts: number;
     private readonly delayedRetryAttempts: number;
     private readonly delayInMs: number;
+    private readonly devMode: boolean;
 
     /**
      * Constructor to initialize the EventResilienceHandler.
@@ -41,11 +42,17 @@ export class EventResilienceHandler {
                     immediateRetryAttempts: 5,
                     delayedRetryAttempts: 3,
                     delayInMs: 1000,
+                    devMode: false,
                 }
     ) {
         this.immediateRetryAttempts = config.immediateRetryAttempts;
         this.delayedRetryAttempts = config.delayedRetryAttempts;
         this.delayInMs = config.delayInMs;
+        this.devMode = config.devMode ?? false;
+        if(this.devMode){
+            this.immediateRetryAttempts = 1;
+            this.delayedRetryAttempts = 0;
+        }
     }
 
     /**
@@ -77,8 +84,9 @@ export class EventResilienceHandler {
                     message: `Event ${event.properties.messageId} - ${EventStatus.TOTAL_PROCESSING_SUCCESS}`,
                     eventUuid: event.properties.messageId,
                     status: EventStatus.TOTAL_PROCESSING_SUCCESS,
+                    type: event.properties.type,
                 });
-            console.log(`Event ${event.properties.messageId} - ${EventStatus.TOTAL_PROCESSING_SUCCESS}`);
+            console.log(`RabbitMQResilience: Event ${event.properties.messageId} - ${EventStatus.TOTAL_PROCESSING_SUCCESS}`);
             console.log('\n');
         }
     }
@@ -108,10 +116,10 @@ export class EventResilienceHandler {
         processName: string
     ): Promise<EventException | null> {
         for (let attempt = 1; attempt <= this.immediateRetryAttempts; attempt++) {
-            this.logEventStatus(event.properties.messageId, attempt, EventStatus.IMMEDIATE_RETRY, processName);
+            this.logEventStatus(event.properties.messageId, event.properties.type, attempt, EventStatus.IMMEDIATE_RETRY, processName);
             try {
                 await this.processEvent(event, processFunction, processName);
-                this.logEventStatus(event.properties.messageId, attempt, EventStatus.PROCESSING_SUCCESS, processName);
+                this.logEventStatus(event.properties.messageId,event.properties.type, attempt, EventStatus.PROCESSING_SUCCESS, processName);
                 return null;
             } catch (err) {
                 const processError = this.handleProcessError(err, attempt, processName);
@@ -185,7 +193,7 @@ export class EventResilienceHandler {
             const [errors, inboxEventDto] = InboxEventDto.create({
                 uuid: event.properties.messageId,
                 type: event.properties.type,
-                headers: event.properties.headers,
+                headers: event.properties.headers ?? {},
                 properties: event.properties,
                 payload: JSON.parse(event.content.toString()),
             });
@@ -213,7 +221,7 @@ export class EventResilienceHandler {
      */
     private async publishToRetryQueue(event: RabbitMQMessageDto, redeliveryCount: number): Promise<void> {
         await RabbitMQ.publishToRetryQueue(event, redeliveryCount);
-        this.logEventStatus(event.properties.messageId, redeliveryCount, EventStatus.SEND_TO_RETRY_QUEUE);
+        this.logEventStatus(event.properties.messageId, event.properties.type, redeliveryCount, EventStatus.SEND_TO_RETRY_QUEUE);
     }
 
     /**
@@ -223,7 +231,7 @@ export class EventResilienceHandler {
      */
     private async publishToDeadLetterQueue(event: RabbitMQMessageDto, errors: EventException[]): Promise<void> {
         await RabbitMQ.publishToDeadLetterQueue(event, errors);
-        this.logEventStatus(event.properties.messageId, this.delayedRetryAttempts, EventStatus.SEND_TO_DEAD_LETTER_QUEUE);
+        this.logEventStatus(event.properties.messageId, event.properties.type, this.delayedRetryAttempts, EventStatus.SEND_TO_DEAD_LETTER_QUEUE);
     }
 
     /**
@@ -233,58 +241,62 @@ export class EventResilienceHandler {
      * @param status - The event status.
      * @param processName - The name of the process (optional).
      */
-    private logEventStatus(eventId: string | undefined, attempt: number, status: EventStatus, processName?: string): void {
+    private logEventStatus(eventId: string | undefined, type: string | undefined , attempt: number, status: EventStatus, processName?: string): void {
         // Message structure: event uuid - status - attempt - process
-        let message = `Event ${eventId} - ${status} - Attempt ${attempt}`;
+        let message = `Event ${eventId} - Type ${type} -  ${status} - Attempt ${attempt}`;
         if (processName) message += ` - Process: ${processName}`;
 
         // Add clear separators for different statuses
         if (status === EventStatus.SEND_TO_RETRY_QUEUE) {
             RabbitMQResilienceSocketManager.emit(signature.SEND_TO_RETRY_QUEUE.abbr,
                 {
-                    message: `Event ${eventId} - ${status} - Attempt ${attempt} - Process: ${processName}`,
+                    message: `Event ${eventId} - Type ${type} - ${status} - Attempt ${attempt} - Process: ${processName}`,
                     eventUuid: eventId,
                     status: status,
                     attempt: attempt,
+                    type:type,
                 });
             console.log('--- Sent to Retry Queue ---\n');
-            console.log(message);
+            console.log("RabbitMQResilience: ",message);
             console.log('\n');
         }
         if (status === EventStatus.SEND_TO_DEAD_LETTER_QUEUE) {
             RabbitMQResilienceSocketManager.emit(signature.SEND_TO_DEAD_LETTER_QUEUE.abbr,
                 {
-                    message: `Event ${eventId} - ${status} - Attempt ${attempt} - Process: ${processName}`,
+                    message: `Event ${eventId} - Type ${type} - ${status} - Attempt ${attempt} - Process: ${processName}`,
                     eventUuid: eventId,
                     status: status,
                     attempt: attempt,
+                    type:type,
                 });
             console.log('*** Sent to Dead Letter Queue ***\n\n');
-            console.log(message);
+            console.log("RabbitMQResilience: ",message);
             console.log('\n');
         }
 
         if (status === EventStatus.IMMEDIATE_RETRY) {
             RabbitMQResilienceSocketManager.emit(signature.IMMEDIATE_RETRY_ATTEMPTS.abbr,
                 {
-                    message: `Event ${eventId} - ${status} - Attempt ${attempt} - Process: ${processName}`,
+                    message: `Event ${eventId} - Type ${type} - ${status} - Attempt ${attempt} - Process: ${processName}`,
                     eventUuid: eventId,
                     status: status,
                     attempt: attempt,
-                    processName: processName
+                    processName: processName,
+                    type:type,
                 });
-            console.log(message);
+            console.log("RabbitMQResilience: ",message);
         }
         if (status === EventStatus.PROCESSING_SUCCESS) {
             RabbitMQResilienceSocketManager.emit(signature.PROCESSING_SUCCESS.abbr,
                 {
-                    message: `Event ${eventId} - ${status} - Attempt ${attempt} - Process: ${processName}`,
+                    message: `Event ${eventId} - Type ${type} - ${status} - Attempt ${attempt} - Process: ${processName}`,
                     eventUuid: eventId,
                     status: status,
                     attempt: attempt,
-                    processName: processName
+                    processName: processName,
+                    type:type,
                 });
-            console.log(message);
+            console.log("RabbitMQResilience: ",message);
         }
     }
 }

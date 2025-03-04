@@ -163,7 +163,40 @@ DB_USERNAME=user
 DB_PASSWORD=password
 DB_NAME=database
 ```
+### Configuring Routes and Socket Manager
 
+To configure the routes for the `RabbitMQResilience` library, you need to set up the routes in your application. Here is an example of how to do it:
+
+```typescript
+import { Hono } from 'hono';
+import { RabbitMQResilienceRoutes ,RabbitMQResilienceSocketManager} from 'rabbitmq-resilience';
+
+class App {
+    private app: Hono;
+    private port: number;
+
+    constructor(options: { port?: number }) {
+        const { port = 3000 } = options;
+        this.app = new Hono();
+        this.port = port;
+    }
+
+    public async start() {
+        // Set up routes of library
+        this.app.route('/', new RabbitMQResilienceRoutes().routes);
+
+        const server = serve({
+            fetch: this.app.fetch,
+            port: this.port
+        }, (info) => {
+            console.log(`Server running on port ${info.port}`);
+        });
+
+        // Initialize socket manager of library
+        RabbitMQResilienceSocketManager.initialize(server, '/websocket/');
+    }
+}
+```
 
 ## Usage
 
