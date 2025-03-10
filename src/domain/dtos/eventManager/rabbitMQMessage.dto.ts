@@ -76,7 +76,7 @@ export class MessagePropertiesDto {
         } = object;
         const errors: string[] = [];
         // Validate properties
-        const [propertiesErrors] = this.validateProperties({ appId, type, contentType, messageId });
+        const [propertiesErrors] = this.validateProperties({type, messageId});
         if (propertiesErrors.length > 0) errors.push(...propertiesErrors);
         if (errors.length > 0) return [errors];
         return [[], new MessagePropertiesDto(
@@ -88,11 +88,9 @@ export class MessagePropertiesDto {
     private static validateProperties(properties: { [key: string]: any }): [string[]] {
         // Validate appId, type, contentType, messageId
         const errors: string[] = [];
-        const { appId, type, contentType, messageId } = properties;
+        const {type, messageId} = properties;
 
-        if (appId === undefined || typeof appId !== 'string') errors.push('Invalid or missing appId');
         if (type === undefined || typeof type !== 'string') errors.push('Invalid or missing type');
-        if (contentType === undefined || typeof contentType !== 'string') errors.push('Invalid or missing contentType');
         if (messageId === undefined || typeof messageId !== 'string') errors.push('Invalid or missing messageId');
 
         return [errors];
