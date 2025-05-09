@@ -65,6 +65,10 @@ export class RabbitMQResilience {
 
     }
 
+    public isConsuming(){ 
+        return RabbitMQ.getIsConsuming()
+    }
+
     /**
      * Synchronizes database tables.
      * @private
@@ -81,7 +85,7 @@ export class RabbitMQResilience {
      * Publishes an event to the default exchange.
      * @param {RabbitMQMessageDto} event - The event to publish.
      */
-    public async pubishEvent(event: RabbitMQMessageDto) {
+    public async publishEvent(event: RabbitMQMessageDto) {
         await RabbitMQ.publishMessage(event);
     }
 
@@ -91,7 +95,7 @@ export class RabbitMQResilience {
      * @param {string} exchange - The exchange to publish to.
      * @param {string} routingKey - The routing key to use.
      */
-    public async pubishEventCustomExchange(event: RabbitMQMessageDto, exchange: string, routingKey: string) {
+    public async publishEventCustomExchange(event: RabbitMQMessageDto, exchange: string, routingKey: string) {
         await RabbitMQ.publishMessage(event, exchange, routingKey);
     }
 
