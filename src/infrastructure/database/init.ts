@@ -1,4 +1,4 @@
-import {Sequelize} from "sequelize";
+import {Sequelize, Options} from "sequelize";
 import {InboxEventSequelize, initInboxEventSequelize} from "@/infrastructure/database/models/eventManager/InboxEvent";
 import {
     EventProcessLogSequelize,
@@ -8,6 +8,8 @@ import {
     initOutboxEventSequelize,
     OutboxEventSequelize
 } from "@/infrastructure/database/models/eventManager/OutboxEvent";
+
+export const sequelize = (config: Options): Sequelize => new Sequelize(config);
 
 export const DbSequelize = async (sequelize: Sequelize): Promise<void> => {
 
