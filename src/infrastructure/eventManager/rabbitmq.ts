@@ -231,13 +231,17 @@ export class RabbitMQ {
             await eventProcessor(msg);
         } else {
             console.log("RabbitMQResilience: Event not found:" + msg.properties.type);
-            RabbitMQResilienceSocketManager.emit(signature.DISCARD_MESSAGE.abbr,
-                {
-                    message: `Event ${msg.properties.messageId} - ${EventStatus.DISCARD_MESSAGE}`,
-                    eventUuid: msg.properties.messageId,
-                    status: EventStatus.DISCARD_MESSAGE,
-                    type: msg.properties.type,
-                });
+
+            if (RabbitMQResilienceSocketManager.getSocket()) {
+                RabbitMQResilienceSocketManager.emit(signature.DISCARD_MESSAGE.abbr,
+                    {
+                        message: `Event ${msg.properties.messageId} - ${EventStatus.DISCARD_MESSAGE}`,
+                        eventUuid: msg.properties.messageId,
+                        status: EventStatus.DISCARD_MESSAGE,
+                        type: msg.properties.type,
+                    }
+                );
+            }
         }
     }
 
