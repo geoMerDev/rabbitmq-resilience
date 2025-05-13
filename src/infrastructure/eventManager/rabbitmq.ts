@@ -217,7 +217,7 @@ export class RabbitMQ {
         )
         this._consumerTag = consumerTag;
         this._isConsuming = true;
-        console.log(`RabbitMQResilience: Started consuming with tag ${this._consumerTag}`);
+        console.log(`RabbitMQResilience: Started consuming with tag ${this._consumerTag}\n`);
     }
 
     /**
@@ -273,7 +273,7 @@ export class RabbitMQ {
 
                 }
             );
-            console.log(`RabbitMQResilience: Published event ${event.properties.messageId} to retry queue with redelivery count ${redeliveryCount}`);
+            console.log(`RabbitMQResilience: Published event ${event.properties.messageId} to retry queue with redelivery count ${redeliveryCount}\n`);
         } else {
             console.log("RabbitMQResilience: Channel not found");
         }
@@ -310,7 +310,7 @@ export class RabbitMQ {
                     persistent: true
                 }
             );
-            console.log(`RabbitMQResilience: Published event ${event.properties.messageId} to dead letter queue`);
+            console.log(`RabbitMQResilience: Published event ${event.properties.messageId} to dead letter queue\n`);
         } else {
             console.log("RabbitMQResilience: Channel not found");
         }
@@ -345,7 +345,7 @@ export class RabbitMQ {
                     persistent: true
                 }
             );
-            console.log(`RabbitMQResilience: Published event to dead letter queue due to error: ${error.join(', ')}`);
+            console.log(`RabbitMQResilience: Published event to dead letter queue due to error: ${error.join(', ')}\n`);
         } else {
             console.log("RabbitMQResilience: Channel not found");
         }
