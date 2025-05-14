@@ -1,4 +1,4 @@
-import {Sequelize} from "sequelize";
+import {Sequelize, Options as SequelizeOptions} from "sequelize";
 import {Options} from "amqplib";
 import {EventResilienceHandlerConfig} from "@/domain/interfaces/eventResilienceHandlerConfig";
 import {EventProcessConfig} from "@/domain/interfaces/eventProcessConfig";
@@ -90,5 +90,10 @@ export interface RabbitMQResilienceConfig {
     /**
      * The Sequelize connection instance.
      */
-    sequelizeConnection: Sequelize;
+    sequelizeConnection: Sequelize | null;
+
+    /**
+     * The Sequelize connection options.
+     */
+    sequelizeOptions?: SequelizeOptions;
 }

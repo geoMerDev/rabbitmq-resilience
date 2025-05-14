@@ -2,7 +2,7 @@ import {RabbitMQMessageDto} from "@/domain/dtos/eventManager";
 import {RabbitMQResilienceConfig} from "@/domain/interfaces/rabbitMQResilienceConfig";
 import {createEventList} from "@/infrastructure/eventManager/createEventList";
 import {RabbitMQ} from "@/infrastructure/eventManager/rabbitmq";
-import {DbSequelize} from "@/infrastructure/database/init";
+import {DbSequelize, sequelize} from "@/infrastructure/database/init";
 
 /**
  * Class responsible for managing RabbitMQ resilience.
@@ -74,11 +74,21 @@ export class RabbitMQResilience {
      * @private
      */
     private async syncTables() {
-        DbSequelize(this.config.sequelizeConnection).then(
-            () => console.log('RabbitMQResilience: Database tables synchronized')
-        ).catch(
-            (e) => console.log("RabbitMQResilience: ",e)
-        );
+        try {
+            if(!this.config.sequelizeConnection &&!this.config.sequelizeOptions)
+                throw new Error("Invalid Instance or sequelize connection options")
+
+            //@ts-ignore
+            const instance = this.config.sequelizeConnection ?? sequelize(this.config.sequelizeOptions);
+
+            DbSequelize(instance).then(
+                () => console.log('RabbitMQResilience: Database tables synchronized')
+            ).catch(
+                (e) => console.log("RabbitMQResilience: ",e)
+            );
+        }catch(error) {
+            console.log("Error: ", error)
+        }
     }
 
     /**

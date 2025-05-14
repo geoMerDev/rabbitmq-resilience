@@ -79,13 +79,16 @@ export class EventResilienceHandler {
                 ? await this.publishToRetryQueue(event, redeliveryCount + 1)
                 : await this.publishToDeadLetterQueue(event, eventErrors);
         } else {
-            RabbitMQResilienceSocketManager.emit(signature.TOTAL_PROCESSING_SUCCESS.abbr,
-                {
-                    message: `Event ${event.properties.messageId} - ${EventStatus.TOTAL_PROCESSING_SUCCESS}`,
-                    eventUuid: event.properties.messageId,
-                    status: EventStatus.TOTAL_PROCESSING_SUCCESS,
-                    type: event.properties.type,
-                });
+            if (RabbitMQResilienceSocketManager.getSocket()) {
+                RabbitMQResilienceSocketManager.emit(signature.TOTAL_PROCESSING_SUCCESS.abbr,
+                    {
+                        message: `Event ${event.properties.messageId} - ${EventStatus.TOTAL_PROCESSING_SUCCESS}`,
+                        eventUuid: event.properties.messageId,
+                        status: EventStatus.TOTAL_PROCESSING_SUCCESS,
+                        type: event.properties.type,
+                    }
+                );
+            }
             console.log(`RabbitMQResilience: Event ${event.properties.messageId} - ${EventStatus.TOTAL_PROCESSING_SUCCESS}`);
             console.log('\n');
         }
@@ -242,61 +245,63 @@ export class EventResilienceHandler {
      * @param processName - The name of the process (optional).
      */
     private logEventStatus(eventId: string | undefined, type: string | undefined , attempt: number, status: EventStatus, processName?: string): void {
-        // Message structure: event uuid - status - attempt - process
-        let message = `Event ${eventId} - Type ${type} -  ${status} - Attempt ${attempt}`;
-        if (processName) message += ` - Process: ${processName}`;
+        if(RabbitMQResilienceSocketManager.getSocket()) {
+            // Message structure: event uuid - status - attempt - process
+            let message = `Event ${eventId} - Type ${type} -  ${status} - Attempt ${attempt}`;
+            if (processName) message += ` - Process: ${processName}`;
 
-        // Add clear separators for different statuses
-        if (status === EventStatus.SEND_TO_RETRY_QUEUE) {
-            RabbitMQResilienceSocketManager.emit(signature.SEND_TO_RETRY_QUEUE.abbr,
-                {
-                    message: `Event ${eventId} - Type ${type} - ${status} - Attempt ${attempt} - Process: ${processName}`,
-                    eventUuid: eventId,
-                    status: status,
-                    attempt: attempt,
-                    type:type,
-                });
-            console.log('--- Sent to Retry Queue ---\n');
-            console.log("RabbitMQResilience: ",message);
-            console.log('\n');
-        }
-        if (status === EventStatus.SEND_TO_DEAD_LETTER_QUEUE) {
-            RabbitMQResilienceSocketManager.emit(signature.SEND_TO_DEAD_LETTER_QUEUE.abbr,
-                {
-                    message: `Event ${eventId} - Type ${type} - ${status} - Attempt ${attempt} - Process: ${processName}`,
-                    eventUuid: eventId,
-                    status: status,
-                    attempt: attempt,
-                    type:type,
-                });
-            console.log('*** Sent to Dead Letter Queue ***\n\n');
-            console.log("RabbitMQResilience: ",message);
-            console.log('\n');
-        }
+            // Add clear separators for different statuses
+            if (status === EventStatus.SEND_TO_RETRY_QUEUE) {
+                RabbitMQResilienceSocketManager.emit(signature.SEND_TO_RETRY_QUEUE.abbr,
+                    {
+                        message: `Event ${eventId} - Type ${type} - ${status} - Attempt ${attempt} - Process: ${processName}`,
+                        eventUuid: eventId,
+                        status: status,
+                        attempt: attempt,
+                        type:type,
+                    });
+                console.log('--- Sent to Retry Queue ---\n');
+                console.log("RabbitMQResilience: ",message);
+                console.log('\n');
+            }
+            if (status === EventStatus.SEND_TO_DEAD_LETTER_QUEUE) {
+                RabbitMQResilienceSocketManager.emit(signature.SEND_TO_DEAD_LETTER_QUEUE.abbr,
+                    {
+                        message: `Event ${eventId} - Type ${type} - ${status} - Attempt ${attempt} - Process: ${processName}`,
+                        eventUuid: eventId,
+                        status: status,
+                        attempt: attempt,
+                        type:type,
+                    });
+                console.log('*** Sent to Dead Letter Queue ***\n\n');
+                console.log("RabbitMQResilience: ",message);
+                console.log('\n');
+            }
 
-        if (status === EventStatus.IMMEDIATE_RETRY) {
-            RabbitMQResilienceSocketManager.emit(signature.IMMEDIATE_RETRY_ATTEMPTS.abbr,
-                {
-                    message: `Event ${eventId} - Type ${type} - ${status} - Attempt ${attempt} - Process: ${processName}`,
-                    eventUuid: eventId,
-                    status: status,
-                    attempt: attempt,
-                    processName: processName,
-                    type:type,
-                });
-            console.log("RabbitMQResilience: ",message);
-        }
-        if (status === EventStatus.PROCESSING_SUCCESS) {
-            RabbitMQResilienceSocketManager.emit(signature.PROCESSING_SUCCESS.abbr,
-                {
-                    message: `Event ${eventId} - Type ${type} - ${status} - Attempt ${attempt} - Process: ${processName}`,
-                    eventUuid: eventId,
-                    status: status,
-                    attempt: attempt,
-                    processName: processName,
-                    type:type,
-                });
-            console.log("RabbitMQResilience: ",message);
+            if (status === EventStatus.IMMEDIATE_RETRY) {
+                RabbitMQResilienceSocketManager.emit(signature.IMMEDIATE_RETRY_ATTEMPTS.abbr,
+                    {
+                        message: `Event ${eventId} - Type ${type} - ${status} - Attempt ${attempt} - Process: ${processName}`,
+                        eventUuid: eventId,
+                        status: status,
+                        attempt: attempt,
+                        processName: processName,
+                        type:type,
+                    });
+                console.log("RabbitMQResilience: ",message);
+            }
+            if (status === EventStatus.PROCESSING_SUCCESS) {
+                RabbitMQResilienceSocketManager.emit(signature.PROCESSING_SUCCESS.abbr,
+                    {
+                        message: `Event ${eventId} - Type ${type} - ${status} - Attempt ${attempt} - Process: ${processName}`,
+                        eventUuid: eventId,
+                        status: status,
+                        attempt: attempt,
+                        processName: processName,
+                        type:type,
+                    });
+                console.log("RabbitMQResilience: ",message);
+            }
         }
     }
 }
