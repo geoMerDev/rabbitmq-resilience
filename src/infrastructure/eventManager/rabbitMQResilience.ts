@@ -55,7 +55,7 @@ export class RabbitMQResilience {
 
         RabbitMQ.config = this.config;
         RabbitMQ.eventList = this.eventList;
-        Logs.config = this.config;
+        Logs.config = this.config.showLogs ? { ...Logs.setDefaultConfig(), ...this.config.showLogs } : Logs.setDefaultConfig();
         await RabbitMQ.connection();
         //only set queues and star consumer if exists event to process
         if (this.eventList.size > 0) {
