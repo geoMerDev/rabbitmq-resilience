@@ -6,6 +6,7 @@ import {EventProcessLogDatasourceImpl} from "@/infrastructure/datasources/eventM
 import {RabbitMQResilienceSocketManager} from "@/infrastructure/socket/rabbitMQResilienceSocketManager";
 import signature from "@/infrastructure/socket/signatures";
 import {EventResilienceHandlerConfig} from "@/domain/interfaces/eventResilienceHandlerConfig";
+import { Logs } from '@/infrastructure/utils/logs';
 
 type EventProcessFunction<T> = (event: RabbitMQMessageDto) => Promise<T>;
 
@@ -89,8 +90,8 @@ export class EventResilienceHandler {
                     }
                 );
             }
-            console.log(`RabbitMQResilience: Event ${event.properties.messageId} - ${EventStatus.TOTAL_PROCESSING_SUCCESS}`);
-            console.log('\n');
+            Logs.info(`RabbitMQResilience: Event ${event.properties.messageId} - ${EventStatus.TOTAL_PROCESSING_SUCCESS}`);
+            Logs.info('\n');
         }
     }
 
@@ -260,9 +261,9 @@ export class EventResilienceHandler {
                         attempt: attempt,
                         type:type,
                     });
-                console.log('--- Sent to Retry Queue ---\n');
-                console.log("RabbitMQResilience: ",message);
-                console.log('\n');
+                Logs.info('--- Sent to Retry Queue ---\n');
+                Logs.info("RabbitMQResilience: ",message);
+                Logs.info('\n');
             }
             if (status === EventStatus.SEND_TO_DEAD_LETTER_QUEUE) {
                 RabbitMQResilienceSocketManager.emit(signature.SEND_TO_DEAD_LETTER_QUEUE.abbr,
@@ -273,9 +274,9 @@ export class EventResilienceHandler {
                         attempt: attempt,
                         type:type,
                     });
-                console.log('*** Sent to Dead Letter Queue ***\n\n');
-                console.log("RabbitMQResilience: ",message);
-                console.log('\n');
+                Logs.info('*** Sent to Dead Letter Queue ***\n\n');
+                Logs.info("RabbitMQResilience: ",message);
+                Logs.info('\n');
             }
 
             if (status === EventStatus.IMMEDIATE_RETRY) {
@@ -288,7 +289,7 @@ export class EventResilienceHandler {
                         processName: processName,
                         type:type,
                     });
-                console.log("RabbitMQResilience: ",message);
+                Logs.info("RabbitMQResilience: ",message);
             }
             if (status === EventStatus.PROCESSING_SUCCESS) {
                 RabbitMQResilienceSocketManager.emit(signature.PROCESSING_SUCCESS.abbr,
@@ -300,7 +301,7 @@ export class EventResilienceHandler {
                         processName: processName,
                         type:type,
                     });
-                console.log("RabbitMQResilience: ",message);
+                Logs.info("RabbitMQResilience: ",message);
             }
         }
     }

@@ -9,6 +9,7 @@ import {EventStatus} from "@/infrastructure/eventManager/eventResilienceHandler"
 import {RabbitMQResilienceConfig} from "@/domain/interfaces/rabbitMQResilienceConfig";
 import {DeliveryInfo} from "@/domain/interfaces/outboxEvent";
 import {InboxEventDatasourceImpl, OutboxEventDatasourceImpl} from "@/infrastructure/datasources/eventManager";
+import { Logs } from '@/infrastructure/utils/logs';
 
 /**
  * Class representing RabbitMQ operations.
@@ -39,27 +40,27 @@ export class RabbitMQ {
             this._channel = await this._connection.createConfirmChannel()
             this.handle()
         } catch (e) {
-            console.log("RabbitMQResilience: ",e)
+            Logs.error("RabbitMQResilience: ",e)
             this.reconnect();
         }
     }
 
     private static handle() {
         this._connection.on('error', (err) => {
-            console.error("RabbitMQResilience: Connection error:", err);
+            Logs.error("RabbitMQResilience: Connection error:", err);
         });
 
         this._connection.on('close', () => {
-            console.warn("RabbitMQResilience: Connection closed. Attempting to reconnect...");
+            Logs.warn("RabbitMQResilience: Connection closed. Attempting to reconnect...");
             this.reconnect();
         });
 
         this._channel.on('error', (err) => {
-            console.error("RabbitMQResilience: Channel error:", err);
+            Logs.error("RabbitMQResilience: Channel error:", err);
         });
 
         this._channel.on('close', () => {
-            console.warn("RabbitMQResilience: Channel closed. Closing connection to reconnect to rabbit...");
+            Logs.warn("RabbitMQResilience: Channel closed. Closing connection to reconnect to rabbit...");
             this._connection.close();
         });
     }
@@ -72,15 +73,15 @@ export class RabbitMQ {
                 await this.connection();
     
                 if (this._channel && this._connection) {
-                    console.log("RabbitMQResilience: Connection established. Trying to consume...");
+                    Logs.info("RabbitMQResilience: Connection established. Trying to consume...");
                     await this.consume();
-                    console.log("RabbitMQResilience: Reconnected successfully.");
+                    Logs.info("RabbitMQResilience: Reconnected successfully.");
                 } else {
                     throw new Error("Connection or channel not available after reconnection.");
                 }
     
             } catch (err) {
-                console.error("RabbitMQResilience: Reconnection failed:", err);
+                Logs.error("RabbitMQResilience: Reconnection failed:", err);
                 this.reconnect(delay * 2);
             }
         }, delay);
@@ -109,9 +110,9 @@ export class RabbitMQ {
             )
 
             await this._channel.prefetch(this._config.prefetch)
-            console.log(`RabbitMQResilience: Queue '${this._config.queue}' is set up and bound to exchange '${this._config.exchange}' with routing key '${this._config.routingKey}'`);
+            Logs.info(`RabbitMQResilience: Queue '${this._config.queue}' is set up and bound to exchange '${this._config.exchange}' with routing key '${this._config.routingKey}'`);
         } else {
-            console.log("RabbitMQResilience: Channel not found")
+            Logs.error("RabbitMQResilience: Channel not found");
         }
     }
 
@@ -141,9 +142,9 @@ export class RabbitMQ {
                 this._config.retryRoutingKey,
             );
 
-            console.log(`RabbitMQResilience: Retry queue '${this._config.retryQueue}' is set up and bound to exchange '${this._config.directExchange}' with routing key '${this._config.retryRoutingKey}'`);
+            Logs.info(`RabbitMQResilience: Retry queue '${this._config.retryQueue}' is set up and bound to exchange '${this._config.directExchange}' with routing key '${this._config.retryRoutingKey}'`);
         } else {
-            console.log("RabbitMQResilience: Channel not found");
+            Logs.error("RabbitMQResilience: Channel not found");
         }
     }
 
@@ -169,9 +170,9 @@ export class RabbitMQ {
                 this._config.deadLetterRoutingKey
             )
 
-           console.log(`RabbitMQResilience: Dead letter queue '${this._config.deadLetterQueue}' is set up and bound to exchange '${this._config.directExchange}' with routing key '${this._config.deadLetterRoutingKey}'`);
+            Logs.info(`RabbitMQResilience: Dead letter queue '${this._config.deadLetterQueue}' is set up and bound to exchange '${this._config.directExchange}' with routing key '${this._config.deadLetterRoutingKey}'`);
         } else {
-            console.log("RabbitMQResilience: Channel not found")
+            Logs.error("RabbitMQResilience: Channel not found");
         }
     }
 
@@ -180,11 +181,11 @@ export class RabbitMQ {
      */
     public static async consume() {
         if (!this._channel) {
-            console.log("RabbitMQResilience: Channel not found");
+            Logs.error("RabbitMQResilience: Channel not found");;
             return;
         }
         if (this._isConsuming) {
-            console.log("RabbitMQResilience: Already consuming. Skipping...");
+            Logs.info("RabbitMQResilience: Already consuming. Skipping...");
             return;
         }
         const { consumerTag } = await this._channel.consume(
@@ -193,6 +194,7 @@ export class RabbitMQ {
                 (async () => {
                     try {
                         const [error, eventDto] = RabbitMQMessageDto.create(msg!);
+                        Logs.time(eventDto?.properties.type);
 
                         if (error.length > 0 || !eventDto) {
                             // Publish to dead letter queue
@@ -202,14 +204,15 @@ export class RabbitMQ {
                         } else {
                             const headers = eventDto.properties.headers;
                             if (headers?.redelivery_count && headers.retry_endpoint !== this._config.retryEndpoint) {
-                                console.log(`RabbitMQResilience: Message ${eventDto.properties.messageId} has redelivery_count and retry_endpoint is different. Acknowledging without processing.`);
+                                Logs.info(`RabbitMQResilience: Message ${eventDto.properties.messageId} has redelivery_count and retry_endpoint is different. Acknowledging without processing.`);
                                 this._channel.ack(msg!);
                                 return;
                             }
                             await this.messageHandler(eventDto);
                         }
+                        Logs.timeEnd(eventDto.properties.type);
                     } catch (error) {
-                        console.log("RabbitMQResilience: ",error);
+                        Logs.error("RabbitMQResilience: ",error);
                     }
                     this._channel.ack(msg!);
                 })();
@@ -217,7 +220,7 @@ export class RabbitMQ {
         )
         this._consumerTag = consumerTag;
         this._isConsuming = true;
-        console.log(`RabbitMQResilience: Started consuming with tag ${this._consumerTag}\n`);
+        Logs.info(`RabbitMQResilience: Started consuming with tag ${this._consumerTag}\n`);
     }
 
     /**
@@ -230,7 +233,7 @@ export class RabbitMQ {
         if (eventProcessor) {
             await eventProcessor(msg);
         } else {
-            console.log("RabbitMQResilience: Event not found:" + msg.properties.type);
+            Logs.info("RabbitMQResilience: Event not found:" + msg.properties.type);
 
             if (RabbitMQResilienceSocketManager.getSocket()) {
                 RabbitMQResilienceSocketManager.emit(signature.DISCARD_MESSAGE.abbr,
@@ -273,9 +276,9 @@ export class RabbitMQ {
 
                 }
             );
-            console.log(`RabbitMQResilience: Published event ${event.properties.messageId} to retry queue with redelivery count ${redeliveryCount}\n`);
+            Logs.info(`RabbitMQResilience: Published event ${event.properties.messageId} to retry queue with redelivery count ${redeliveryCount}\n`);
         } else {
-            console.log("RabbitMQResilience: Channel not found");
+            Logs.error("RabbitMQResilience: Channel not found");
         }
     }
 
@@ -310,9 +313,9 @@ export class RabbitMQ {
                     persistent: true
                 }
             );
-            console.log(`RabbitMQResilience: Published event ${event.properties.messageId} to dead letter queue\n`);
+            Logs.info(`RabbitMQResilience: Published event ${event.properties.messageId} to dead letter queue\n`);
         } else {
-            console.log("RabbitMQResilience: Channel not found");
+            Logs.error("RabbitMQResilience: Channel not found");
         }
     }
 
@@ -345,9 +348,9 @@ export class RabbitMQ {
                     persistent: true
                 }
             );
-            console.log(`RabbitMQResilience: Published event to dead letter queue due to error: ${error.join(', ')}\n`);
+            Logs.info(`RabbitMQResilience: Published event to dead letter queue due to error: ${error.join(', ')}\n`);
         } else {
-            console.log("RabbitMQResilience: Channel not found");
+            Logs.error("RabbitMQResilience: Channel not found");
         }
     }
 
@@ -423,7 +426,7 @@ export class RabbitMQ {
                 await this.publishToExchangeWithConfirmation(event, defaultExchange, defaultRoutingKey);
             }
         } else {
-            console.log("RabbitMQResilience: Channel not found");
+            Logs.error("RabbitMQResilience: Channel not found");
         }
     }
 
@@ -453,12 +456,12 @@ export class RabbitMQ {
             await new OutboxEventDatasourceImpl().registerFromRabbitMQMessageDto(event, deliveryInfo);
 
             if (result) {
-                console.log(`RabbitMQResilience: Published event ${event.properties.messageId} to queue ${queue}`);
+                Logs.info(`RabbitMQResilience: Published event ${event.properties.messageId} to queue ${queue}`);
             } else {
-                console.error(`Failed to publish event ${event.properties.messageId} to queue ${queue}`);
+                Logs.error(`Failed to publish event ${event.properties.messageId} to queue ${queue}`);
             }
         } else {
-            console.log("RabbitMQResilience: Channel not found");
+            Logs.error("RabbitMQResilience: Channel not found");
         }
     }
 
@@ -490,12 +493,12 @@ export class RabbitMQ {
             await new OutboxEventDatasourceImpl().registerFromRabbitMQMessageDto(event, deliveryInfo);
 
             if (result) {
-                console.log(`RabbitMQResilience: Published event ${event.properties.messageId} to exchange ${exchange}`);
+                Logs.info(`RabbitMQResilience: Published event ${event.properties.messageId} to exchange ${exchange}`);
             } else {
-                console.error(`RabbitMQResilience: Failed to publish event ${event.properties.messageId} to exchange ${exchange}`);
+                Logs.error(`RabbitMQResilience: Failed to publish event ${event.properties.messageId} to exchange ${exchange}`);
             }
         } else {
-            console.log("RabbitMQResilience: Channel not found");
+            Logs.error("RabbitMQResilience: Channel not found");
         }
     }
 
@@ -529,7 +532,7 @@ export class RabbitMQ {
         // Get event from inbox
         const inboxEvent = await new InboxEventDatasourceImpl().getByUuid(uuid);
         if (!inboxEvent) {
-            console.error(`Event ${uuid} not found in inbox`);
+            Logs.error(`Event ${uuid} not found in inbox`);
             return;
         }
         // Transform inbox event to RabbitMQMessageDto
@@ -538,7 +541,7 @@ export class RabbitMQ {
             properties: inboxEvent.properties,
         });
         if (error.length > 0 || !eventDto) {
-            console.error(`Failed to create RabbitMQMessageDto: ${error.join(', ')}`);
+            Logs.error(`Failed to create RabbitMQMessageDto: ${error.join(', ')}`);
             return;
         }
 
@@ -551,13 +554,13 @@ export class RabbitMQ {
                 try {
                     await process.processFunction(eventDto);
                 } catch (error) {
-                    console.error(`Error processing event ${uuid} with process ${process.processName}:`, error);
+                    Logs.error(`Error processing event ${uuid} with process ${process.processName}:`, error);
                 }
             } else {
-                console.error(`No process found with name ${processName} for event type ${inboxEvent.type}`);
+                Logs.error(`No process found with name ${processName} for event type ${inboxEvent.type}`);
             }
         } else {
-            console.error(`No processes found for event type ${inboxEvent.type}`);
+            Logs.error(`No processes found for event type ${inboxEvent.type}`);
         }
     }
 

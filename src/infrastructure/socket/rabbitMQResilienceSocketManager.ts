@@ -1,6 +1,7 @@
 import {ServerType} from '@hono/node-server/dist/types';
 import {Server, Socket} from 'socket.io'
 import signatures from './signatures';
+import { Logs } from '@/infrastructure/utils/logs';
 
 export class RabbitMQResilienceSocketManager {
     private static io: Server;
@@ -22,7 +23,7 @@ export class RabbitMQResilienceSocketManager {
 
     private static setupSocketEvents() {
         RabbitMQResilienceSocketManager.io.on('connection', (socket: Socket) => {
-            console.log('RabbitMQResilience: a user connected', socket.id);
+            Logs.info('RabbitMQResilience: a user connected', socket.id);
         })
     }
 
