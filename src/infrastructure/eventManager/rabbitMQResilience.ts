@@ -3,6 +3,7 @@ import {RabbitMQResilienceConfig} from "@/domain/interfaces/rabbitMQResilienceCo
 import {createEventList} from "@/infrastructure/eventManager/createEventList";
 import {RabbitMQ} from "@/infrastructure/eventManager/rabbitmq";
 import {DbSequelize, sequelize} from "@/infrastructure/database/init";
+import { Logs } from '@/infrastructure/utils/logs';
 
 /**
  * Class responsible for managing RabbitMQ resilience.
@@ -54,6 +55,7 @@ export class RabbitMQResilience {
 
         RabbitMQ.config = this.config;
         RabbitMQ.eventList = this.eventList;
+        Logs.config = this.config;
         await RabbitMQ.connection();
         //only set queues and star consumer if exists event to process
         if (this.eventList.size > 0) {
@@ -82,12 +84,12 @@ export class RabbitMQResilience {
             const instance = this.config.sequelizeConnection ?? sequelize(this.config.sequelizeOptions);
 
             DbSequelize(instance).then(
-                () => console.log('RabbitMQResilience: Database tables synchronized')
+                () => Logs.info('RabbitMQResilience: Database tables synchronized')
             ).catch(
-                (e) => console.log("RabbitMQResilience: ",e)
+                (e) => Logs.error("RabbitMQResilience: ",e)
             );
         }catch(error) {
-            console.log("Error: ", error)
+            Logs.error("Error: ", error)
         }
     }
 

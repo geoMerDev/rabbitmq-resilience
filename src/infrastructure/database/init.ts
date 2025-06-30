@@ -8,6 +8,7 @@ import {
     initOutboxEventSequelize,
     OutboxEventSequelize
 } from "@/infrastructure/database/models/eventManager/OutboxEvent";
+import { Logs } from '@/infrastructure/utils/logs';
 
 export const sequelize = (config: Options): Sequelize => new Sequelize(config);
 
@@ -22,7 +23,7 @@ export const DbSequelize = async (sequelize: Sequelize): Promise<void> => {
         await EventProcessLogSequelize.sync();
         await OutboxEventSequelize.sync();
     } catch (e) {
-        console.log(e);
+        Logs.error(e as string);
         throw e;
     }
 };

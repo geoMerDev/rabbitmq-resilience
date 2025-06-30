@@ -96,4 +96,20 @@ export interface RabbitMQResilienceConfig {
      * The Sequelize connection options.
      */
     sequelizeOptions?: SequelizeOptions;
+
+    /**
+     * Whether to show logs for the RabbitMQ resilience operations.
+     */
+    showLogs?: ShowLogs;
+}
+
+export interface ShowLogs {
+    log?:boolean,
+    error?:boolean,
+    warn?:boolean,
+    info?:boolean,
+    debug?:boolean,
+    trace?:boolean,
+    time?:boolean,
+    timeEnd?:boolean,
 }
