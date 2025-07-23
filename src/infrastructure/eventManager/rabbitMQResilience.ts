@@ -4,6 +4,8 @@ import {createEventList} from "@/infrastructure/eventManager/createEventList";
 import {RabbitMQ} from "@/infrastructure/eventManager/rabbitmq";
 import {DbSequelize, sequelize} from "@/infrastructure/database/init";
 import { Logs } from '@/infrastructure/utils/logs';
+import { SlackConfig } from "@/domain/interfaces/slackConfig";
+import DatabaseHook from "../database/hook";
 
 /**
  * Class responsible for managing RabbitMQ resilience.
@@ -11,6 +13,7 @@ import { Logs } from '@/infrastructure/utils/logs';
 export class RabbitMQResilience {
     private static instance: RabbitMQResilience;
     private readonly config: RabbitMQResilienceConfig;
+    private readonly slackConfig: SlackConfig;
     private readonly eventList: Map<string, (rabbitMQMessageDto: RabbitMQMessageDto) => Promise<void>>;
 
     /**
@@ -20,6 +23,7 @@ export class RabbitMQResilience {
     private constructor(config: RabbitMQResilienceConfig) {
         this.config = config;
         this.eventList = createEventList(config);
+        this.slackConfig = config.slackConfig;
     }
 
     /**
@@ -51,10 +55,12 @@ export class RabbitMQResilience {
      */
     public async init() {
         // Sync tables
+        DatabaseHook.config = this.config.rotationTables;
         await this.syncTables();
 
         RabbitMQ.config = this.config;
         RabbitMQ.eventList = this.eventList;
+        RabbitMQ.slackConfig = this.slackConfig;
         Logs.config = this.config.showLogs ? { ...Logs.setDefaultConfig(), ...this.config.showLogs } : Logs.setDefaultConfig();
         await RabbitMQ.connection();
         //only set queues and star consumer if exists event to process

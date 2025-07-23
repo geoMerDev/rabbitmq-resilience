@@ -54,5 +54,8 @@
   "_moduleAliases": {
     "@": "dist/src",
     "@tests": "dist/tests"
+  },
+  "dependencies": {
+    "@slack/webhook": "^7.0.5"
   }
 }

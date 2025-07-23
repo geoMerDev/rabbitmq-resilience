@@ -2,6 +2,7 @@ import {Sequelize, Options as SequelizeOptions} from "sequelize";
 import {Options} from "amqplib";
 import {EventResilienceHandlerConfig} from "@/domain/interfaces/eventResilienceHandlerConfig";
 import {EventProcessConfig} from "@/domain/interfaces/eventProcessConfig";
+import { SlackConfig } from "./slackConfig";
 
 /**
  * Interface representing the configuration for RabbitMQ resilience.
@@ -101,6 +102,16 @@ export interface RabbitMQResilienceConfig {
      * Whether to show logs for the RabbitMQ resilience operations.
      */
     showLogs?: ShowLogs;
+
+    /**
+     * Configuration for Slack notifications.
+     */
+    slackConfig: SlackConfig;
+
+    /**
+     * Rotations tables
+     */
+    rotationTables: RotationTables;
 }
 
 export interface ShowLogs {
@@ -112,4 +123,10 @@ export interface ShowLogs {
     trace?:boolean,
     time?:boolean,
     timeEnd?:boolean,
+}
+
+export interface RotationTables {
+    enable: boolean;
+    maxRecords: number;
+
 }
