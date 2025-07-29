@@ -7,6 +7,7 @@ import {RabbitMQResilienceSocketManager} from "@/infrastructure/socket/rabbitMQR
 import signature from "@/infrastructure/socket/signatures";
 import {EventResilienceHandlerConfig} from "@/domain/interfaces/eventResilienceHandlerConfig";
 import { Logs } from '@/infrastructure/utils/logs';
+import { Slack } from "../slack/slack";
 
 type EventProcessFunction<T> = (event: RabbitMQMessageDto) => Promise<T>;
 
@@ -235,6 +236,7 @@ export class EventResilienceHandler {
      */
     private async publishToDeadLetterQueue(event: RabbitMQMessageDto, errors: EventException[]): Promise<void> {
         await RabbitMQ.publishToDeadLetterQueue(event, errors);
+        await Slack.sendMessage(event);
         this.logEventStatus(event.properties.messageId, event.properties.type, this.delayedRetryAttempts, EventStatus.SEND_TO_DEAD_LETTER_QUEUE);
     }
 

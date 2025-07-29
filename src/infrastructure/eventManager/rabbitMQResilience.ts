@@ -6,6 +6,7 @@ import {DbSequelize, sequelize} from "@/infrastructure/database/init";
 import { Logs } from '@/infrastructure/utils/logs';
 import { SlackConfig } from "@/domain/interfaces/slackConfig";
 import DatabaseHook from "../database/hook";
+import { Slack } from "../slack/slack";
 
 /**
  * Class responsible for managing RabbitMQ resilience.
@@ -62,6 +63,8 @@ export class RabbitMQResilience {
         RabbitMQ.eventList = this.eventList;
         RabbitMQ.slackConfig = this.slackConfig;
         Logs.config = this.config.showLogs ? { ...Logs.setDefaultConfig(), ...this.config.showLogs } : Logs.setDefaultConfig();
+        Slack.config = this.slackConfig;
+        Slack.initialize();
         await RabbitMQ.connection();
         //only set queues and star consumer if exists event to process
         if (this.eventList.size > 0) {

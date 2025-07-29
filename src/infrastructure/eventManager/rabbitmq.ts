@@ -204,6 +204,7 @@ export class RabbitMQ {
 
                         if (error.length > 0 || !eventDto) {
                             // Publish to dead letter queue
+                            Logs.error(`RabbitMQResilience: Error creating RabbitMQMessageDto: ${error.join(', ')}`);
                             await this.sendToDeadLetterQueueOnError(msg!, error);
                             this._channel.ack(msg!);
                             return;
@@ -218,7 +219,7 @@ export class RabbitMQ {
                         }
                         Logs.timeEnd(eventDto.properties.type);
                     } catch (error) {
-                        Logs.error("RabbitMQResilience: ",error);
+                        Logs.error(error as string);
                     }
                     this._channel.ack(msg!);
                 })();
