@@ -1,6 +1,6 @@
 import { RotationTables } from '@/domain/interfaces/rabbitMQResilienceConfig';
 import { EventProcessLogSequelize, InboxEventSequelize, OutboxEventSequelize } from './models/eventManager'
-import { Model } from 'sequelize';
+import { Model, ModelStatic, Op } from 'sequelize';
 import fs from 'fs'
 import path from 'path'
 import zlib from 'zlib'
@@ -43,40 +43,16 @@ export default class DatabaseHook {
                     DatabaseHook.config.sftpServer.sftpPath = '/';
                 }
             }
-            EventProcessLogSequelize.afterCreate(async () => {
-                const totalCount = await EventProcessLogSequelize.count();
-                if (totalCount >= DatabaseHook.config.maxRecords) {
-                    const rows = await EventProcessLogSequelize.findAll({
-                        order: [['createdAt', 'ASC']],
-                        limit: DatabaseHook.config.maxRecords
-                    });
+            const modelsToHook: Array<ModelStatic<Model<any, any>>> = [
+                EventProcessLogSequelize,
+                InboxEventSequelize,
+                OutboxEventSequelize
+            ];
 
-                    const sql = this.convertIntoSql(rows);
-                    await this.compressAndSaveSql(sql);
-
-                }
-            });
-            InboxEventSequelize.afterCreate(async () => {
-                const totalCount = await InboxEventSequelize.count();
-                if (totalCount >= DatabaseHook.config.maxRecords) {
-                    const rows = await InboxEventSequelize.findAll({
-                        order: [['createdAt', 'ASC']],
-                        limit: DatabaseHook.config.maxRecords
-                    });
-                    const sql = this.convertIntoSql(rows);
-                    await this.compressAndSaveSql(sql);
-                }
-            });
-            OutboxEventSequelize.afterCreate(async () => {
-                const totalCount = await OutboxEventSequelize.count();
-                if (totalCount >= DatabaseHook.config.maxRecords) {
-                    const rows = await OutboxEventSequelize.findAll({
-                        order: [['createdAt', 'ASC']],
-                        limit: DatabaseHook.config.maxRecords
-                    });
-                    const sql = this.convertIntoSql(rows);
-                    await this.compressAndSaveSql(sql);
-                }
+            modelsToHook.forEach((model) => {
+                model.afterCreate(async () => {
+                    await this.handleAfterCreate(model);
+                });
             });
         } catch (error) {
             Logs.error("Error checking rotation:", error);
@@ -175,6 +151,28 @@ export default class DatabaseHook {
             Logs.error("Error sending to external server:", error);
         } finally {
             sftp.end();
+        }
+    }
+
+    public static async handleAfterCreate(model: ModelStatic<Model<any,any>>): Promise<void> {
+        const totalCount = await model.count();
+        if (totalCount >= DatabaseHook.config.maxRecords) {
+            const rows = await model.findAll({
+                order: [['createdAt', 'ASC']],
+                limit: DatabaseHook.config.maxRecords
+            });
+
+            const sql = this.convertIntoSql(rows);
+            await this.compressAndSaveSql(sql);
+            const ids = rows.map(row => row.get('id'));
+
+            await model.destroy({
+                where: {
+                    id: {
+                        [Op.in]: ids
+                    }
+                }
+            });
         }
     }
 }
