@@ -6,6 +6,9 @@ import path from 'path'
 import zlib from 'zlib'
 import SFTPClient from 'ssh2-sftp-client'
 import { Logs } from '../utils/logs';
+import { MigrationHistorySequelize } from './models/eventManager/MigrationHistory';
+import { MigrationHistoryDatasource } from '@/domain/datasources/eventManager/migrationHistory.datasource';
+import { MigrationHistoryDatasourceImpl } from '../datasources/eventManager/migrationHistory.datasource.impl';
 
 export default class DatabaseHook {
     public static config: RotationTables;
@@ -146,6 +149,7 @@ export default class DatabaseHook {
             if (DatabaseHook.config.sftpServer) {
                 await sftp.connect(DatabaseHook.config.sftpServer)
                 await sftp.put(filePath, DatabaseHook.config.sftpServer.sftpPath! + nameDoc)
+                await new MigrationHistoryDatasourceImpl().createMigrationHistory(nameDoc, DatabaseHook.config.sftpServer.sftpPath! + nameDoc);
             }
         } catch (error) {
             Logs.error("Error sending to external server:", error);
