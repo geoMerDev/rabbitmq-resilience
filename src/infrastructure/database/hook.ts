@@ -1,6 +1,6 @@
 import { RotationTables } from '@/domain/interfaces/rabbitMQResilienceConfig';
 import { EventProcessLogSequelize, InboxEventSequelize, OutboxEventSequelize } from './models/eventManager'
-import { Model, ModelStatic, Op } from 'sequelize';
+import { Model, ModelStatic, Op, Sequelize, QueryTypes } from 'sequelize';
 import fs from 'fs'
 import path from 'path'
 import zlib from 'zlib'
@@ -17,6 +17,7 @@ export default class DatabaseHook {
             if (!DatabaseHook.config.enable) {
                 return
             } else {
+                this.checkConfiguration();
                 if (!DatabaseHook.config.sftpServer) {
                     Logs.warn("SFTP server configuration is missing. Skipping rotation.");
                     return;
@@ -130,7 +131,7 @@ export default class DatabaseHook {
             return new Promise<string>((resolve, reject) => {
                 input.pipe(gzip).pipe(output)
                     .on('finish', async () => {
-                        await this.sendToExternalServer(compressedPath, docName)                        
+                        await this.sendToExternalServer(compressedPath, docName)
                         fs.unlinkSync(compressedPath)
                         fs.unlinkSync(sqlPath)
                         resolve(compressedPath)
@@ -158,17 +159,29 @@ export default class DatabaseHook {
         }
     }
 
-    public static async handleAfterCreate(model: ModelStatic<Model<any,any>>): Promise<void> {
-        const totalCount = await model.count();
-        if (totalCount >= DatabaseHook.config.maxRecords) {
-            const rows = await model.findAll({
-                order: [['createdAt', 'ASC']],
-                limit: DatabaseHook.config.maxRecords
-            });
+    public static async handleAfterCreate(model: ModelStatic<Model<any, any>>): Promise<void> {
+        let records: Model<any, any>[] = [];
+        switch (DatabaseHook.config.typeOfRotation) {
+            case 'max-records':
+                records = await this.handleMaxRecords(model);
+                break;
 
-            const sql = this.convertIntoSql(rows);
+            case 'size-table':
+                records = await this.handleSizeRecords(model);
+                break;
+
+            case 'time-rotation':
+                records = await this.handleTimeRotations(model);
+                break;
+
+            default:
+                console.warn(`Tipo de rotación no soportado: ${DatabaseHook.config.typeOfRotation}`);
+                break;
+        }
+        if (records && records.length > 0) {
+            const sql = this.convertIntoSql(records);
             await this.compressAndSaveSql(sql);
-            const ids = rows.map(row => row.get('id'));
+            const ids = records.map(row => row.get('id'));
 
             await model.destroy({
                 where: {
@@ -177,6 +190,82 @@ export default class DatabaseHook {
                     }
                 }
             });
+        }
+    }
+
+    public static async handleMaxRecords(model: ModelStatic<Model<any, any>>): Promise<Model<any, any>[]> {
+        const totalCount = await model.count();
+        if (totalCount >= DatabaseHook.config.maxRecords!) {
+            return await model.findAll({
+                order: [['createdAt', 'ASC']],
+                limit: DatabaseHook.config.maxRecords
+            });
+        } else {
+            return [];
+        }
+    }
+
+    public static async handleSizeRecords(model: ModelStatic<Model<any, any>>): Promise<Model<any, any>[]> {
+        const sequelize = model.sequelize!;
+        const tableName = model.getTableName() as string;
+        const dbName = (sequelize.config.database as string);
+
+        // Consulta real del tamaño de la tabla (data + indexes)
+        const [results] = await sequelize.query<{
+            total_bytes: number;
+        }>(`
+            SELECT 
+                (DATA_LENGTH + INDEX_LENGTH) AS total_bytes
+            FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = :dbName
+            AND TABLE_NAME = :tableName
+            LIMIT 1;
+        `, {
+            replacements: { dbName, tableName },
+            type: QueryTypes.SELECT
+        });
+
+        const tableSizeBytes = results?.total_bytes ?? 0;
+        const maxBytes = (DatabaseHook.config.maxSizeMB ?? 300) * 1024 * 1024;
+
+        if (tableSizeBytes >= maxBytes) {
+            // Si supera el límite, devuelve todos los registros (por ejemplo, para archivarlos o eliminarlos)
+            const records = await model.findAll({
+                order: [['createdAt', 'ASC']],
+            });
+            return records;
+        }
+
+        return [];
+    }
+
+    public static async handleTimeRotations(model: ModelStatic<Model<any, any>>): Promise<Model<any, any>[]> {
+        const maxAgeDays = DatabaseHook.config.maxAgeDays;
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - maxAgeDays!);
+
+        const oldRecords = await model.findAll({
+            where: {
+                createdAt: {
+                    [Op.lt]: cutoffDate
+                }
+            },
+            order: [['createdAt', 'ASC']]
+        });
+
+        return oldRecords;
+    }
+
+    public static checkConfiguration(): void {
+        if (DatabaseHook.config.typeOfRotation === 'max-records') {
+            if (!DatabaseHook.config.maxRecords) throw new Error("maxRecords is required for max-records rotation type");
+            if(DatabaseHook.config.maxRecords <= 0) throw new Error("maxRecords must be greater than 0");
+        } else if (DatabaseHook.config.typeOfRotation === 'size-table') {
+            if (!DatabaseHook.config.maxSizeMB) throw new Error("maxSizeMB is required for size-table rotation type");
+            if(DatabaseHook.config.maxSizeMB <= 0) throw new Error("maxSizeMB must be greater than 0");
+        } else if (DatabaseHook.config.typeOfRotation === 'time-rotation') {
+            if (!DatabaseHook.config.maxAgeDays) throw new Error("maxAgeDays is required for time-rotation rotation type");
+            if(DatabaseHook.config.maxAgeDays <= 0) throw new Error("maxAgeDays must be greater than 0");
         }
     }
 }

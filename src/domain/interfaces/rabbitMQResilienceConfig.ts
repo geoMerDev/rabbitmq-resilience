@@ -128,8 +128,11 @@ export interface ShowLogs {
 
 export interface RotationTables {
     enable: boolean;
-    maxRecords: number;
+    typeOfRotation: 'max-records' | 'size-table' | 'time-rotation';
     sftpServer?: SftpConnectOptions;
+    maxRecords?: number;
+    maxSizeMB?: number;
+    maxAgeDays?: number;
 }
 
 
