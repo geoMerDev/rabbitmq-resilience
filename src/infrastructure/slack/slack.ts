@@ -1,5 +1,4 @@
-import { SlackConfig } from "@/domain/interfaces/slackConfig";
-import { IncomingWebhook } from "@slack/webhook";
+import { EmailConfigInterface } from "@/domain/interfaces/slackConfig";
 import nodemailer, { Transporter } from "nodemailer";
 import SMTPTransport from "nodemailer/lib/smtp-transport";
 import fs from "fs";
@@ -9,22 +8,22 @@ import path from 'path';
 interface Replacements {
     [key: string]: string;
 }
-export class Slack {
+export class EmailConfig {
     public static transporter: Transporter<SMTPTransport.SentMessageInfo, SMTPTransport.Options>;
-    public static config: SlackConfig;
+    public static config: EmailConfigInterface;
 
     public static initialize() {
-        if (!Slack.config) {
-            throw new Error('Slack configuration is not initialized');
+        if (!this.config) {
+            throw new Error('Email configuration is not initialized');
         }
 
-        Slack.transporter = nodemailer.createTransport({
+        this.transporter = nodemailer.createTransport({
             auth: {
-                user: Slack.config.EMAIL_AUTH_USER,
-                pass: Slack.config.EMAIL_AUTH_PASS,
+                user: this.config.EMAIL_AUTH_USER,
+                pass: this.config.EMAIL_AUTH_PASS,
             },
-            host: Slack.config.EMAIL_HOST,
-            port: Slack.config.EMAIL_PORT,
+            host: this.config.EMAIL_HOST,
+            port: this.config.EMAIL_PORT,
         });
     }
 
@@ -36,7 +35,7 @@ export class Slack {
             });
             await this.transporter.sendMail({
                 from: `${this.config.APP_NAME} <${this.config.APP_NAME.replace(/\s+/g, '').toLowerCase()}>`,
-                to: Slack.config.SLACK_EMAIL,
+                to: this.config.EMAIL,
                 subject: `${this.config.APP_NAME} Error Notification`,
                 html: htmlContent,
             });

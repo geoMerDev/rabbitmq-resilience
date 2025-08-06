@@ -1,5 +1,4 @@
 import { ShowLogs } from "@/domain/interfaces/rabbitMQResilienceConfig";
-import { Slack } from "../slack/slack";
 
 export class Logs {
     public static config: ShowLogs

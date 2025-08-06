@@ -4,9 +4,9 @@ import {createEventList} from "@/infrastructure/eventManager/createEventList";
 import {RabbitMQ} from "@/infrastructure/eventManager/rabbitmq";
 import {DbSequelize, sequelize} from "@/infrastructure/database/init";
 import { Logs } from '@/infrastructure/utils/logs';
-import { SlackConfig } from "@/domain/interfaces/slackConfig";
+import { EmailConfigInterface } from "@/domain/interfaces/slackConfig";
 import DatabaseHook from "../database/hook";
-import { Slack } from "../slack/slack";
+import { EmailConfig } from "../slack/slack";
 
 /**
  * Class responsible for managing RabbitMQ resilience.
@@ -14,7 +14,7 @@ import { Slack } from "../slack/slack";
 export class RabbitMQResilience {
     private static instance: RabbitMQResilience;
     private readonly config: RabbitMQResilienceConfig;
-    private readonly slackConfig: SlackConfig;
+    private readonly emailConfig: EmailConfigInterface;
     private readonly eventList: Map<string, (rabbitMQMessageDto: RabbitMQMessageDto) => Promise<void>>;
 
     /**
@@ -24,7 +24,7 @@ export class RabbitMQResilience {
     private constructor(config: RabbitMQResilienceConfig) {
         this.config = config;
         this.eventList = createEventList(config);
-        this.slackConfig = config.slackConfig;
+        this.emailConfig = config.emailConfig;
     }
 
     /**
@@ -61,10 +61,10 @@ export class RabbitMQResilience {
 
         RabbitMQ.config = this.config;
         RabbitMQ.eventList = this.eventList;
-        RabbitMQ.slackConfig = this.slackConfig;
+        RabbitMQ.emailConfig = this.emailConfig;
         Logs.config = this.config.showLogs ? { ...Logs.setDefaultConfig(), ...this.config.showLogs } : Logs.setDefaultConfig();
-        Slack.config = this.slackConfig;
-        Slack.initialize();
+        EmailConfig.config = this.emailConfig;
+        EmailConfig.initialize();
         await RabbitMQ.connection();
         //only set queues and star consumer if exists event to process
         if (this.eventList.size > 0) {

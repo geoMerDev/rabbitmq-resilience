@@ -10,7 +10,7 @@ import {RabbitMQResilienceConfig} from "@/domain/interfaces/rabbitMQResilienceCo
 import {DeliveryInfo} from "@/domain/interfaces/outboxEvent";
 import {InboxEventDatasourceImpl, OutboxEventDatasourceImpl} from "@/infrastructure/datasources/eventManager";
 import { Logs } from '@/infrastructure/utils/logs';
-import { SlackConfig } from '@/domain/interfaces/slackConfig';
+import { EmailConfigInterface } from '@/domain/interfaces/slackConfig';
 
 /**
  * Class representing RabbitMQ operations.
@@ -22,7 +22,7 @@ export class RabbitMQ {
     private static _consumerTag: string | null = null;
     private static _config: RabbitMQResilienceConfig
     private static _eventList: Map<string, (rabbitMQMessageDto: RabbitMQMessageDto) => Promise<void>>;
-    private static _slackConfig: SlackConfig;
+    private static _emailConfig: EmailConfigInterface;
 
     public static set config(value: RabbitMQResilienceConfig) {
         this._config = value;
@@ -32,8 +32,8 @@ export class RabbitMQ {
         this._eventList = value;
     }
 
-    public static set slackConfig(value: SlackConfig) {
-        this._slackConfig = value;
+    public static set emailConfig(value: EmailConfigInterface) {
+        this._emailConfig = value;
     }
 
 
