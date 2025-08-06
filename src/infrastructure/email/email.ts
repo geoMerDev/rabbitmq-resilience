@@ -1,9 +1,11 @@
-import { EmailConfigInterface } from "@/domain/interfaces/slackConfig";
+import { EmailConfigInterface } from "@/domain/interfaces/emailConfig";
 import nodemailer, { Transporter } from "nodemailer";
 import SMTPTransport from "nodemailer/lib/smtp-transport";
 import fs from "fs";
 import { RabbitMQMessageDto } from "@/domain/dtos/eventManager";
 import path from 'path';
+import { Logs } from "../utils/logs";
+import { EventException } from "../eventManager/eventException";
 
 interface Replacements {
     [key: string]: string;
@@ -27,18 +29,24 @@ export class EmailConfig {
         });
     }
 
-    public static async sendMessage(event: RabbitMQMessageDto): Promise<void> {
-        if (this.transporter) {
-            const htmlContent = this.renderTemplate('../utils/template/error.template.html', {
-                errorTitle: `Error Notification - ${event.properties.type}`,
-                errorMessage: event.content.toString()
-            });
-            await this.transporter.sendMail({
-                from: `${this.config.APP_NAME} <${this.config.APP_NAME.replace(/\s+/g, '').toLowerCase()}>`,
-                to: this.config.EMAIL,
-                subject: `${this.config.APP_NAME} Error Notification`,
-                html: htmlContent,
-            });
+    public static async sendMessage(event: RabbitMQMessageDto, errors: EventException[]): Promise<void> {
+        try {
+            if (this.transporter) {
+                const htmlContent = this.renderTemplate('../utils/template/error.template.html', {
+                    errorTitle: `Error Notification - ${event.properties.type}`,
+                    messageUuid: event.properties.messageId,
+                    errorMessage: event.content.toString(),
+                    errorStack: errors.map(error => error.stack).join('\n')
+                });
+                await this.transporter.sendMail({
+                    from: `${this.config.APP_NAME} - rabbitmq-resilience <${this.config.APP_NAME.replace(/\s+/g, '').toLowerCase()}>`,
+                    to: this.config.EMAIL,
+                    subject: `${this.config.APP_NAME} Error Notification`,
+                    html: htmlContent,
+                });
+            }
+        } catch (error) {
+            Logs.error(`Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 

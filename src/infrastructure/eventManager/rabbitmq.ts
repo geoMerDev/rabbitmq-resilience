@@ -10,7 +10,7 @@ import {RabbitMQResilienceConfig} from "@/domain/interfaces/rabbitMQResilienceCo
 import {DeliveryInfo} from "@/domain/interfaces/outboxEvent";
 import {InboxEventDatasourceImpl, OutboxEventDatasourceImpl} from "@/infrastructure/datasources/eventManager";
 import { Logs } from '@/infrastructure/utils/logs';
-import { EmailConfigInterface } from '@/domain/interfaces/slackConfig';
+import { EmailConfigInterface } from '@/domain/interfaces/emailConfig';
 
 /**
  * Class representing RabbitMQ operations.

@@ -4,9 +4,9 @@ import {createEventList} from "@/infrastructure/eventManager/createEventList";
 import {RabbitMQ} from "@/infrastructure/eventManager/rabbitmq";
 import {DbSequelize, sequelize} from "@/infrastructure/database/init";
 import { Logs } from '@/infrastructure/utils/logs';
-import { EmailConfigInterface } from "@/domain/interfaces/slackConfig";
+import { EmailConfigInterface } from "@/domain/interfaces/emailConfig";
 import DatabaseHook from "../database/hook";
-import { EmailConfig } from "../slack/slack";
+import { EmailConfig } from "../email/email";
 
 /**
  * Class responsible for managing RabbitMQ resilience.

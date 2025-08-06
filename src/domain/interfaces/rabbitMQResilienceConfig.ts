@@ -2,7 +2,7 @@ import {Sequelize, Options as SequelizeOptions} from "sequelize";
 import {Options} from "amqplib";
 import {EventResilienceHandlerConfig} from "@/domain/interfaces/eventResilienceHandlerConfig";
 import {EventProcessConfig} from "@/domain/interfaces/eventProcessConfig";
-import { EmailConfigInterface } from "./slackConfig";
+import { EmailConfigInterface } from "./emailConfig";
 import type { ConnectOptions } from 'ssh2-sftp-client'
 
 /**
@@ -112,7 +112,7 @@ export interface RabbitMQResilienceConfig {
     /**
      * Rotations tables
      */
-    rotationTables: RotationTables;
+    rotationTables?: RotationTables;
 }
 
 export interface ShowLogs {
