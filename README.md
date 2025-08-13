@@ -252,6 +252,66 @@ await RabbitMQR.republishEvent('event-uuid');
 await RabbitMQR.reprocessEvent('event-uuid', 'process-name');
 ```
 
+### Control your logs
+
+You can decide what logs want to see and wich one no. 
+Find it at the config file like this. If set it as off all are on by default
+
+```
+    {
+        ...
+        showLogs: {
+            log?:boolean,
+            error?:boolean,
+            warn?:boolean,
+            info?:boolean,
+            debug?:boolean,
+            trace?:boolean,
+            time?:boolean,
+            timeEnd?:boolean
+        },
+        ...
+    }
+```
+
+### Configuration of smtp
+This smtp is for failed events the ones that goes to dead letter.
+This configuration is obligatory
+````
+    {
+        ...
+        emailConfig:{
+            APP_NAME:string,
+            EMAIL:string,
+            EMAIL_AUTH_USER:string,
+            EMAIL_AUTH_PASS:string,
+            EMAIL_HOST:string,
+            EMAIL_PORT:number
+        },
+        ...
+    }
+````
+
+### Table rotations
+This section is made so the tables of rabbitmq-resilence dont overlap with information. For this to work you have to enable first. If the sftp server is not enable then the migration will be save at local server.Follow up this configurations.
+
+```
+    {
+        ...
+            rotationTables:{
+                enable: boolean;
+                typeOfRotation: 'max-records' | 'size-table' | 'time-rotation';
+                sftpServer?: SftpConnectOptions;
+                maxRecords?: number;
+                maxSizeMB?: number;
+                maxAgeDays?: number;
+            }
+        ...
+    }
+```
+
+
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

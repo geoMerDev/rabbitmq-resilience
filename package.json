@@ -1,11 +1,11 @@
 {
   "name": "rabbitmq-resilience",
-  "version": "0.0.9",
+  "version": "0.0.18",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "dev": "tsnd --respawn --clear -r tsconfig-paths/register src/app.ts",
-    "build": "rimraf ./dist && tsc && tsc-alias"
+    "build": "rimraf ./dist && tsc && tsc-alias && echo 'Copying HTML files...' && cpx \"src/**/*.html\" dist/ && echo 'HTML files and image copied!'"
   },
   "keywords": [
     "rabbitmq",
@@ -30,6 +30,7 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^20.12.7",
     "@types/nodemailer": "^6.4.15",
+    "@types/ssh2-sftp-client": "^9.0.5",
     "@types/supertest": "^6.0.2",
     "@types/uuid": "^9.0.8",
     "ts-jest": "^29.2.3",
@@ -38,7 +39,9 @@
     "ts-patch": "^3.2.1",
     "tsc-alias": "^1.8.10",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.2",
+    "nodemailer": "^7.0.5",
+    "ssh2-sftp-client": "^12.0.1"
   },
   "peerDependencies": {
     "@hono/node-server": "^1.11.1",

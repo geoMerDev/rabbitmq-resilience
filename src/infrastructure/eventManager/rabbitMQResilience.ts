@@ -4,6 +4,9 @@ import {createEventList} from "@/infrastructure/eventManager/createEventList";
 import {RabbitMQ} from "@/infrastructure/eventManager/rabbitmq";
 import {DbSequelize, sequelize} from "@/infrastructure/database/init";
 import { Logs } from '@/infrastructure/utils/logs';
+import { EmailConfigInterface } from "@/domain/interfaces/emailConfig";
+import DatabaseHook from "../database/hook";
+import { EmailConfig } from "../email/email";
 
 /**
  * Class responsible for managing RabbitMQ resilience.
@@ -11,6 +14,7 @@ import { Logs } from '@/infrastructure/utils/logs';
 export class RabbitMQResilience {
     private static instance: RabbitMQResilience;
     private readonly config: RabbitMQResilienceConfig;
+    private readonly emailConfig: EmailConfigInterface;
     private readonly eventList: Map<string, (rabbitMQMessageDto: RabbitMQMessageDto) => Promise<void>>;
 
     /**
@@ -20,6 +24,7 @@ export class RabbitMQResilience {
     private constructor(config: RabbitMQResilienceConfig) {
         this.config = config;
         this.eventList = createEventList(config);
+        this.emailConfig = config.emailConfig;
     }
 
     /**
@@ -51,11 +56,15 @@ export class RabbitMQResilience {
      */
     public async init() {
         // Sync tables
+        DatabaseHook.config = this.config.rotationTables;
         await this.syncTables();
 
         RabbitMQ.config = this.config;
         RabbitMQ.eventList = this.eventList;
+        RabbitMQ.emailConfig = this.emailConfig;
         Logs.config = this.config.showLogs ? { ...Logs.setDefaultConfig(), ...this.config.showLogs } : Logs.setDefaultConfig();
+        EmailConfig.config = this.emailConfig;
+        EmailConfig.initialize();
         await RabbitMQ.connection();
         //only set queues and star consumer if exists event to process
         if (this.eventList.size > 0) {

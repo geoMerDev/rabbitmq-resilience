@@ -10,6 +10,7 @@ import {RabbitMQResilienceConfig} from "@/domain/interfaces/rabbitMQResilienceCo
 import {DeliveryInfo} from "@/domain/interfaces/outboxEvent";
 import {InboxEventDatasourceImpl, OutboxEventDatasourceImpl} from "@/infrastructure/datasources/eventManager";
 import { Logs } from '@/infrastructure/utils/logs';
+import { EmailConfigInterface } from '@/domain/interfaces/emailConfig';
 
 /**
  * Class representing RabbitMQ operations.
@@ -21,6 +22,7 @@ export class RabbitMQ {
     private static _consumerTag: string | null = null;
     private static _config: RabbitMQResilienceConfig
     private static _eventList: Map<string, (rabbitMQMessageDto: RabbitMQMessageDto) => Promise<void>>;
+    private static _emailConfig: EmailConfigInterface;
 
     public static set config(value: RabbitMQResilienceConfig) {
         this._config = value;
@@ -28,6 +30,10 @@ export class RabbitMQ {
 
     public static set eventList(value: Map<string, (rabbitMQMessageDto: RabbitMQMessageDto) => Promise<void>>) {
         this._eventList = value;
+    }
+
+    public static set emailConfig(value: EmailConfigInterface) {
+        this._emailConfig = value;
     }
 
 
@@ -198,6 +204,7 @@ export class RabbitMQ {
 
                         if (error.length > 0 || !eventDto) {
                             // Publish to dead letter queue
+                            Logs.error(`RabbitMQResilience: Error creating RabbitMQMessageDto: ${error.join(', ')}`);
                             await this.sendToDeadLetterQueueOnError(msg!, error);
                             this._channel.ack(msg!);
                             return;
@@ -212,7 +219,7 @@ export class RabbitMQ {
                         }
                         Logs.timeEnd(eventDto.properties.type);
                     } catch (error) {
-                        Logs.error("RabbitMQResilience: ",error);
+                        Logs.error(error as string);
                     }
                     this._channel.ack(msg!);
                 })();
