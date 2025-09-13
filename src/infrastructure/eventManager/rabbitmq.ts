@@ -545,6 +545,7 @@ export class RabbitMQ {
         // Transform inbox event to RabbitMQMessageDto
         const [error, eventDto] = RabbitMQMessageDto.create({
             content: Buffer.from(JSON.stringify(inboxEvent.payload)),
+            fields: inboxEvent.headers,
             properties: inboxEvent.properties,
         });
         if (error.length > 0 || !eventDto) {
