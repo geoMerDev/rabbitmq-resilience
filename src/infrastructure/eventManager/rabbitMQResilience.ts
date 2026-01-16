@@ -1,8 +1,8 @@
-import {RabbitMQMessageDto} from "@/domain/dtos/eventManager";
-import {RabbitMQResilienceConfig} from "@/domain/interfaces/rabbitMQResilienceConfig";
-import {createEventList} from "@/infrastructure/eventManager/createEventList";
-import {RabbitMQ} from "@/infrastructure/eventManager/rabbitmq";
-import {DbSequelize, sequelize} from "@/infrastructure/database/init";
+import { RabbitMQMessageDto } from "@/domain/dtos/eventManager";
+import { RabbitMQResilienceConfig } from "@/domain/interfaces/rabbitMQResilienceConfig";
+import { createEventList } from "@/infrastructure/eventManager/createEventList";
+import { RabbitMQ } from "@/infrastructure/eventManager/rabbitmq";
+import { DbSequelize, sequelize } from "@/infrastructure/database/init";
 import { Logs } from '@/infrastructure/utils/logs';
 import { EmailConfigInterface } from "@/domain/interfaces/emailConfig";
 import DatabaseHook from "../database/hook";
@@ -55,28 +55,35 @@ export class RabbitMQResilience {
      * Initializes RabbitMQ connection and sets up queues.
      */
     public async init() {
-        // Sync tables
-        DatabaseHook.config = this.config.rotationTables;
-        await this.syncTables();
+        try {
+            // Sync tables (CRÍTICO - debe fallar si no conecta)
+            DatabaseHook.config = this.config.rotationTables;
+            await this.syncTables(); // Si falla aquí, se detiene todo
 
-        RabbitMQ.config = this.config;
-        RabbitMQ.eventList = this.eventList;
-        RabbitMQ.emailConfig = this.emailConfig;
-        Logs.config = this.config.showLogs ? { ...Logs.setDefaultConfig(), ...this.config.showLogs } : Logs.setDefaultConfig();
-        EmailConfig.config = this.emailConfig;
-        EmailConfig.initialize();
-        await RabbitMQ.connection();
-        //only set queues and star consumer if exists event to process
-        if (this.eventList.size > 0) {
-            await RabbitMQ.setQueue();
-            await RabbitMQ.setRetryQueue();
-            await RabbitMQ.setDeadLetterQueue();
-            await RabbitMQ.consume();
+            RabbitMQ.config = this.config;
+            RabbitMQ.eventList = this.eventList;
+            RabbitMQ.emailConfig = this.emailConfig;
+            Logs.config = this.config.showLogs ? { ...Logs.setDefaultConfig(), ...this.config.showLogs } : Logs.setDefaultConfig();
+            EmailConfig.config = this.emailConfig;
+            EmailConfig.initialize();
+            await RabbitMQ.connection();
+
+            if (this.eventList.size > 0) {
+                await RabbitMQ.setQueue();
+                await RabbitMQ.setRetryQueue();
+                await RabbitMQ.setDeadLetterQueue();
+                await RabbitMQ.consume();
+            }
+            
+            // Republicar eventos pendientes con attempts = 0
+            await RabbitMQ.republishPendingEvents();
+        } catch (error) {
+            Logs.error("RabbitMQResilience: Initialization failed:", error);
+            throw error; // Re-lanzar para que el llamador lo maneje
         }
-
     }
 
-    public isConsuming(){ 
+    public isConsuming() {
         return RabbitMQ.getIsConsuming()
     }
 
@@ -85,20 +92,22 @@ export class RabbitMQResilience {
      * @private
      */
     private async syncTables() {
-        try {
-            if(!this.config.sequelizeConnection &&!this.config.sequelizeOptions)
-                throw new Error("Invalid Instance or sequelize connection options")
+        if (!this.config.sequelizeConnection && !this.config.sequelizeOptions) {
+            throw new Error("RabbitMQResilience: Invalid Instance or sequelize connection options");
+        }
 
+        try {
             //@ts-ignore
             const instance = this.config.sequelizeConnection ?? sequelize(this.config.sequelizeOptions);
 
-            DbSequelize(instance).then(
-                () => Logs.info('RabbitMQResilience: Database tables synchronized')
-            ).catch(
-                (e) => Logs.error("RabbitMQResilience: ",e)
-            );
-        }catch(error) {
-            Logs.error("Error: ", error)
+            // Usar await en lugar de .then().catch()
+            await DbSequelize(instance);
+
+            Logs.info('RabbitMQResilience: Database tables synchronized successfully');
+        } catch (error) {
+            Logs.error("RabbitMQResilience: Failed to connect to database:", error);
+            // RE-LANZAR el error para que init() lo capture
+            throw new Error(`RabbitMQResilience: Database connection failed - ${error}`);
         }
     }
 

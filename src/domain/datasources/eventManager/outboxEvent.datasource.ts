@@ -13,5 +13,6 @@ export abstract class OutboxEventDatasource {
 
     abstract registerFromRabbitMQMessageDto(rabbitMQMessageDto: RabbitMQMessageDto, deliveryInfo: DeliveryInfo| null): Promise<OutboxEventEntity>;
 
+    abstract getByAttemptsZero(): Promise<OutboxEventEntity[]>;
 
 }

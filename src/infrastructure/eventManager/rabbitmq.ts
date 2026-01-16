@@ -1,14 +1,14 @@
-import {Channel, connect, Connection} from 'amqplib';
-import {assertExchange, assertQueue} from './config';
-import {RabbitMQMessageDto} from "@/domain/dtos/eventManager";
-import {EventException} from "@/infrastructure/eventManager/eventException";
-import {QueueStatus} from "@/domain/entities/eventManager/rabbitMQInfo.entity";
-import {RabbitMQResilienceSocketManager} from "@/infrastructure/socket/rabbitMQResilienceSocketManager";
+import { Channel, connect, Connection } from 'amqplib';
+import { assertExchange, assertQueue } from './config';
+import { RabbitMQMessageDto } from "@/domain/dtos/eventManager";
+import { EventException } from "@/infrastructure/eventManager/eventException";
+import { QueueStatus } from "@/domain/entities/eventManager/rabbitMQInfo.entity";
+import { RabbitMQResilienceSocketManager } from "@/infrastructure/socket/rabbitMQResilienceSocketManager";
 import signature from "@/infrastructure/socket/signatures";
-import {EventStatus} from "@/infrastructure/eventManager/eventResilienceHandler";
-import {RabbitMQResilienceConfig} from "@/domain/interfaces/rabbitMQResilienceConfig";
-import {DeliveryInfo} from "@/domain/interfaces/outboxEvent";
-import {InboxEventDatasourceImpl, OutboxEventDatasourceImpl} from "@/infrastructure/datasources/eventManager";
+import { EventStatus } from "@/infrastructure/eventManager/eventResilienceHandler";
+import { RabbitMQResilienceConfig } from "@/domain/interfaces/rabbitMQResilienceConfig";
+import { DeliveryInfo } from "@/domain/interfaces/outboxEvent";
+import { InboxEventDatasourceImpl, OutboxEventDatasourceImpl } from "@/infrastructure/datasources/eventManager";
 import { Logs } from '@/infrastructure/utils/logs';
 import { EmailConfigInterface } from '@/domain/interfaces/emailConfig';
 
@@ -46,7 +46,7 @@ export class RabbitMQ {
             this._channel = await this._connection.createConfirmChannel()
             this.handle()
         } catch (e) {
-            Logs.error("RabbitMQResilience: ",e)
+            Logs.error("RabbitMQResilience: ", e)
             this.reconnect();
         }
     }
@@ -70,22 +70,25 @@ export class RabbitMQ {
             this._connection.close();
         });
     }
-    
+
     private static async reconnect(delay = 5000) {
         this._isConsuming = false;
-        
+
         setTimeout(async () => {
             try {
                 await this.connection();
-    
+
                 if (this._channel && this._connection) {
                     Logs.info("RabbitMQResilience: Connection established. Trying to consume...");
                     await this.consume();
                     Logs.info("RabbitMQResilience: Reconnected successfully.");
+                    
+                    // Republicar eventos con attempts = 0
+                    await this.republishPendingEvents();
                 } else {
                     throw new Error("Connection or channel not available after reconnection.");
                 }
-    
+
             } catch (err) {
                 Logs.error("RabbitMQResilience: Reconnection failed:", err);
                 this.reconnect(delay * 2);
@@ -439,6 +442,16 @@ export class RabbitMQ {
 
     public static async publishToQueueWithConfirmation(queue: string, event: RabbitMQMessageDto) {
         if (this._channel) {
+            const deliveryInfo: DeliveryInfo | null = {
+                timestamp: new Date(),
+                host: this.getHost(),
+                virtualHost: this.getVirtualHost(),
+                destinationType: 'queue',
+                destinationName: queue
+            };
+
+            await new OutboxEventDatasourceImpl().registerFromRabbitMQMessageDto(event, deliveryInfo);
+            
             const result = this._channel.sendToQueue(
                 queue,
                 event.content,
@@ -452,16 +465,6 @@ export class RabbitMQ {
                 }
             );
 
-            const deliveryInfo: DeliveryInfo | null = result ? {
-                timestamp: new Date(),
-                host: this.getHost(),
-                virtualHost: this.getVirtualHost(),
-                destinationType: 'queue',
-                destinationName: queue
-            } : null;
-
-            await new OutboxEventDatasourceImpl().registerFromRabbitMQMessageDto(event, deliveryInfo);
-
             if (result) {
                 Logs.info(`RabbitMQResilience: Published event ${event.properties.messageId} to queue ${queue}`);
             } else {
@@ -474,6 +477,17 @@ export class RabbitMQ {
 
     public static async publishToExchangeWithConfirmation(event: RabbitMQMessageDto, exchange: string, routingKey: string) {
         if (this._channel) {
+            const deliveryInfo: DeliveryInfo | null = {
+                timestamp: new Date(),
+                host: this.getHost(),
+                virtualHost: this.getVirtualHost(),
+                destinationType: 'exchange',
+                destinationName: exchange,
+                routingKey: routingKey
+            };
+
+            await new OutboxEventDatasourceImpl().registerFromRabbitMQMessageDto(event, deliveryInfo);
+
             const result = this._channel.publish(
                 exchange,
                 routingKey,
@@ -487,18 +501,6 @@ export class RabbitMQ {
                     persistent: true
                 }
             );
-
-            const deliveryInfo: DeliveryInfo | null = result ? {
-                timestamp: new Date(),
-                host: this.getHost(),
-                virtualHost: this.getVirtualHost(),
-                destinationType: 'exchange',
-                destinationName: exchange,
-                routingKey: routingKey
-            } : null;
-
-            await new OutboxEventDatasourceImpl().registerFromRabbitMQMessageDto(event, deliveryInfo);
-
             if (result) {
                 Logs.info(`RabbitMQResilience: Published event ${event.properties.messageId} to exchange ${exchange}`);
             } else {
@@ -568,6 +570,52 @@ export class RabbitMQ {
             }
         } else {
             Logs.error(`No processes found for event type ${inboxEvent.type}`);
+        }
+    }
+
+    /**
+     * Republishes all pending events with attempts = 0 from the outbox.
+     * This is called after reconnecting to RabbitMQ to ensure no events are lost.
+     */
+    public static async republishPendingEvents() {
+        try {
+            Logs.info("RabbitMQResilience: Checking for pending events with attempts = 0...");
+            
+            const pendingEvents = await new OutboxEventDatasourceImpl().getByAttemptsZero();
+            
+            if (pendingEvents.length === 0) {
+                Logs.info("RabbitMQResilience: No pending events to republish.");
+                return;
+            }
+            
+            Logs.info(`RabbitMQResilience: Found ${pendingEvents.length} pending event(s). Republishing...`);
+            
+            for (const outboxEvent of pendingEvents) {
+                try {
+                    const [error, eventDto] = RabbitMQMessageDto.create({
+                        content: Buffer.from(JSON.stringify(outboxEvent.payload)),
+                        properties: outboxEvent.properties,
+                        
+                    });
+
+                    if (error.length > 0 || !eventDto) {
+                        Logs.error(`RabbitMQResilience: Failed to create RabbitMQMessageDto for event ${outboxEvent.uuid}: ${error.join(', ')}`);
+                        continue;
+                    }
+
+                    // Republish the event
+                    await this.publishMessage(eventDto);
+                    Logs.info(`RabbitMQResilience: Successfully republished event ${outboxEvent.uuid}`);
+                    
+                } catch (error) {
+                    Logs.error(`RabbitMQResilience: Error republishing event ${outboxEvent.uuid}:`, error);
+                }
+            }
+            
+            Logs.info(`RabbitMQResilience: Finished republishing ${pendingEvents.length} pending event(s).\n`);
+            
+        } catch (error) {
+            Logs.error("RabbitMQResilience: Error while republishing pending events:", error);
         }
     }
 

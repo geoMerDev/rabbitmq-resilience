@@ -48,7 +48,7 @@ export class OutboxEventDatasourceImpl implements OutboxEventDatasource {
                 properties: outboxEventDto.properties,
                 payload: outboxEventDto.payload,
                 deliveryInfo: outboxEventDto.deliveryInfo,
-                attempts: outboxEventDto.attempts
+                attempts: 0
             });
             return this.mapToEntity(outboxEvent);
         }
@@ -108,5 +108,14 @@ export class OutboxEventDatasourceImpl implements OutboxEventDatasource {
         return this.register(outboxEventDto!);
     }
 
+    async getByAttemptsZero(): Promise<OutboxEventEntity[]> {
+        const outboxEvents = await OutboxEventSequelize.findAll({
+            where: {
+                attempts: 0
+            },
+            order: [['id', 'ASC']]
+        });
+        return outboxEvents.map(outboxEvent => this.mapToEntity(outboxEvent));
+    }
 
 }
