@@ -442,16 +442,6 @@ export class RabbitMQ {
 
     public static async publishToQueueWithConfirmation(queue: string, event: RabbitMQMessageDto) {
         if (this._channel) {
-            const deliveryInfo: DeliveryInfo | null = {
-                timestamp: new Date(),
-                host: this.getHost(),
-                virtualHost: this.getVirtualHost(),
-                destinationType: 'queue',
-                destinationName: queue
-            };
-
-            await new OutboxEventDatasourceImpl().registerFromRabbitMQMessageDto(event, deliveryInfo);
-            
             const result = this._channel.sendToQueue(
                 queue,
                 event.content,
@@ -464,6 +454,16 @@ export class RabbitMQ {
                     persistent: true
                 }
             );
+            
+            const deliveryInfo: DeliveryInfo | null = result ? {
+                timestamp: new Date(),
+                host: this.getHost(),
+                virtualHost: this.getVirtualHost(),
+                destinationType: 'queue',
+                destinationName: queue
+            } : null;
+
+            await new OutboxEventDatasourceImpl().registerFromRabbitMQMessageDto(event, deliveryInfo);
 
             if (result) {
                 Logs.info(`RabbitMQResilience: Published event ${event.properties.messageId} to queue ${queue}`);
@@ -477,17 +477,6 @@ export class RabbitMQ {
 
     public static async publishToExchangeWithConfirmation(event: RabbitMQMessageDto, exchange: string, routingKey: string) {
         if (this._channel) {
-            const deliveryInfo: DeliveryInfo | null = {
-                timestamp: new Date(),
-                host: this.getHost(),
-                virtualHost: this.getVirtualHost(),
-                destinationType: 'exchange',
-                destinationName: exchange,
-                routingKey: routingKey
-            };
-
-            await new OutboxEventDatasourceImpl().registerFromRabbitMQMessageDto(event, deliveryInfo);
-
             const result = this._channel.publish(
                 exchange,
                 routingKey,
@@ -501,6 +490,18 @@ export class RabbitMQ {
                     persistent: true
                 }
             );
+
+            const deliveryInfo: DeliveryInfo | null =  result ? {
+                timestamp: new Date(),
+                host: this.getHost(),
+                virtualHost: this.getVirtualHost(),
+                destinationType: 'exchange',
+                destinationName: exchange,
+                routingKey: routingKey
+            } : null;
+
+            await new OutboxEventDatasourceImpl().registerFromRabbitMQMessageDto(event, deliveryInfo);
+
             if (result) {
                 Logs.info(`RabbitMQResilience: Published event ${event.properties.messageId} to exchange ${exchange}`);
             } else {

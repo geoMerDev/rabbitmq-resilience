@@ -132,6 +132,7 @@ export class EventResilienceHandler {
                 else return processError;
             }
         }
+        // Este return nunca se alcanza ya que el loop siempre retorna en alguna iteración
         return null;
     }
 

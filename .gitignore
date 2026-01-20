@@ -4,3 +4,12 @@ node_modules
 /etc/secrets/**
 .scannerwork/**
 /dist/**
+
+# Test coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# Test databases
+*.sqlite
+*.sqlite3
