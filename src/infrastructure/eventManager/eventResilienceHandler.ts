@@ -127,6 +127,7 @@ export class EventResilienceHandler {
                 this.logEventStatus(event.properties.messageId,event.properties.type, attempt, EventStatus.PROCESSING_SUCCESS, processName);
                 return null;
             } catch (err) {
+                Logs.error(`Error processing event ${event.properties.messageId} on attempt ${attempt} for process ${processName}:`, err);
                 const processError = this.handleProcessError(err, attempt, processName);
                 if (attempt < this.immediateRetryAttempts) await this.delay(this.delayInMs);
                 else return processError;

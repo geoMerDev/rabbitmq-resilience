@@ -213,32 +213,61 @@ export class RabbitMQ {
         const { consumerTag } = await this._channel.consume(
             this._config.queue,
             (msg) => {
+                if (!msg) return;
+
+                // FAST PATH: Extract type directly from raw message
+                const eventType = msg.properties.type;
+
+                // Check if processor exists BEFORE creating expensive DTO
+                if (!this._eventList.has(eventType)) {
+                    // Immediate discard - synchronous, no DTO creation
+                    try {
+                        this._channel.ack(msg);
+
+                        // Log for observability
+                        Logs.info(`RabbitMQResilience: Discarded unregistered event - Type: ${eventType}, MessageId: ${msg.properties.messageId}`);
+
+                        // Optional: Emit socket notification if connected (minimal overhead)
+                        if (RabbitMQResilienceSocketManager.getSocket()) {
+                            RabbitMQResilienceSocketManager.emit(signature.DISCARD_MESSAGE.abbr, {
+                                message: `Event ${msg.properties.messageId} - ${EventStatus.DISCARD_MESSAGE}`,
+                                eventUuid: msg.properties.messageId,
+                                status: EventStatus.DISCARD_MESSAGE,
+                                type: eventType,
+                            });
+                        }
+                    } catch (error) {
+                        Logs.error(`RabbitMQResilience: Error acknowledging discarded message: ${error}`);
+                    }
+                    return;
+                }
+
+                // SLOW PATH: Only create DTO for valid events
                 (async () => {
-                    const [error, eventDto] = RabbitMQMessageDto.create(msg!);
-                    const eventType = eventDto?.properties.type || 'unknown';
-                    
+                    const [error, eventDto] = RabbitMQMessageDto.create(msg);
+
                     try {
                         if (error.length > 0 || !eventDto) {
                             // Publish to dead letter queue
                             Logs.error(`RabbitMQResilience: Error creating RabbitMQMessageDto: ${error.join(', ')}`);
-                            await this.sendToDeadLetterQueueOnError(msg!, error);
+                            await this.sendToDeadLetterQueueOnError(msg, error);
                             return;
                         }
-                        
+
                         const headers = eventDto.properties.headers;
                         if (headers?.redelivery_count && headers.retry_endpoint !== this._config.retryEndpoint) {
                             Logs.warn(`RabbitMQResilience: Message ${eventDto.properties.messageId} has redelivery_count and retry_endpoint is different (${headers.retry_endpoint} vs ${this._config.retryEndpoint}). Sending to DLQ.`);
                             await this.publishToDeadLetterQueue(eventDto, null);
                             return;
                         }
-                        
+
                         Logs.time(`${eventType}-${eventDto.properties.messageId}`);
                         await this.messageHandler(eventDto);
                         Logs.timeEnd(`${eventType}-${eventDto.properties.messageId}`);
                     } catch (error) {
                         Logs.error(error as string);
                     } finally {
-                        this._channel.ack(msg!);
+                        this._channel.ack(msg);
                     }
                 })();
             }
