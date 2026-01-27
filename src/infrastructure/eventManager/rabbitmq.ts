@@ -223,6 +223,19 @@ export class RabbitMQ {
                     // Immediate discard - synchronous, no DTO creation
                     try {
                         this._channel.ack(msg);
+
+                        // Log for observability
+                        Logs.info(`RabbitMQResilience: Discarded unregistered event - Type: ${eventType}, MessageId: ${msg.properties.messageId}`);
+
+                        // Optional: Emit socket notification if connected (minimal overhead)
+                        if (RabbitMQResilienceSocketManager.getSocket()) {
+                            RabbitMQResilienceSocketManager.emit(signature.DISCARD_MESSAGE.abbr, {
+                                message: `Event ${msg.properties.messageId} - ${EventStatus.DISCARD_MESSAGE}`,
+                                eventUuid: msg.properties.messageId,
+                                status: EventStatus.DISCARD_MESSAGE,
+                                type: eventType,
+                            });
+                        }
                     } catch (error) {
                         Logs.error(`RabbitMQResilience: Error acknowledging discarded message: ${error}`);
                     }
